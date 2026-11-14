@@ -1,11 +1,11 @@
 import { feature } from "topojson-client";
 import { geoBounds } from "d3-geo";
-import world from "world-atlas/countries-50m.json";
+import world from "../data/europe-10m.json";
 
 export const EU = {
   "040": "AT", "056": "BE", "100": "BG", "191": "HR", "196": "CY", "203": "CZ", "208": "DK", "233": "EE", "246": "FI",
   "250": "FR", "276": "DE", "300": "GR", "348": "HU", "372": "IE", "380": "IT", "428": "LV", "440": "LT", "442": "LU",
-  "470": "MT", "528": "NL", "616": "PL", "620": "PT", "642": "RO", "703": "SK", "705": "SI", "724": "ES", "752": "SE"
+  "470": "MT", "528": "NL", "616": "PL", "620": "PT", "642": "RO", "703": "SK", "705": "SI", "724": "ES", "752": "SE", "248": "FI"
 };
 
 export const COUNTRY_NAMES = {

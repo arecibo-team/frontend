@@ -17,7 +17,9 @@ export const NON_INTERACTIVE = new Set([
   // North Africa
   "Morocco", "Algeria", "Tunisia", "Libya", "Egypt", "W. Sahara",
   // Middle East (also outside Europe)
-  "Syria", "Lebanon", "Israel", "Palestine", "Jordan", "Iraq", "Iran", "Saudi Arabia"
+  "Syria", "Lebanon", "Israel", "Palestine", "Jordan", "Iraq", "Iran", "Saudi Arabia",
+  "Kuwait", "Bahrain", "Qatar", "United Arab Emirates", "Oman", "Uzbekistan", "Turkmenistan", "Afghanistan", "Pakistan",
+  "Baikonur", "Mali", "Mauritania"
 ]);
 
 // Base maps (switchable, like Google Maps "Map type").

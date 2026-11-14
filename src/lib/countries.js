@@ -1,6 +1,6 @@
-// Country borders: Natural Earth 1:50m via world-atlas, bundled locally.
+// Country borders: Natural Earth 1:10m, clipped to Europe and bundled locally.
 import { feature } from "topojson-client";
-import world50m from "world-atlas/countries-50m.json";
+import world10m from "../data/europe-10m.json";
 import polylabel from "polylabel";
 import { clipPolygon } from "lineclip";
 import L from "leaflet";
@@ -78,7 +78,7 @@ let cache = null;
 export function getCountries() {
   if (cache) return cache;
   const bounds = L.latLngBounds(EUROPE_BOUNDS);
-  const all = feature(world50m, world50m.objects.countries);
+  const all = feature(world10m, world10m.objects.countries);
   const features = all.features.map(f => clipToMap(f, bounds)).filter(Boolean);
   cache = {
     interactive: { type: "FeatureCollection", features: features.filter(isInteractive) },

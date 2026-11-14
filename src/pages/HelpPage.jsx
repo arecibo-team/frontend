@@ -27,19 +27,24 @@ const REASONS_ONE = {
   "low power": "has little to spare"
 };
 
-function mainland(feature) {
-  if (feature.geometry.type !== "MultiPolygon") return geoCentroid(feature);
-  const parts = feature.geometry.coordinates.map(coordinates => ({ type: "Polygon", coordinates }));
-  parts.sort((a, b) => geoArea(b) - geoArea(a));
-  return geoCentroid(parts[0]);
+function polygons(feature) {
+  const g = feature.geometry;
+  const list = g.type === "MultiPolygon" ? g.coordinates : [g.coordinates];
+  return list.map(coordinates => ({ type: "Polygon", coordinates }));
 }
 
-const CENTROIDS = Object.fromEntries(
-  COUNTRIES.filter(f => f.iso2).map(f => {
-    const [lon, lat] = mainland(f);
-    return [f.iso2, [lat, lon]];
-  })
-);
+const CENTROIDS = {};
+const LARGEST = {};
+COUNTRIES.filter(f => f.iso2).forEach(f => {
+  polygons(f).forEach(p => {
+    const a = geoArea(p);
+    if (a > (LARGEST[f.iso2] || 0)) {
+      LARGEST[f.iso2] = a;
+      const [lon, lat] = geoCentroid(p);
+      CENTROIDS[f.iso2] = [lat, lon];
+    }
+  });
+});
 
 function Scenario({ form, setForm, onRun, busy }) {
   const names = Object.entries(COUNTRY_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
