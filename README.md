@@ -17,7 +17,11 @@ One screen built around the EU map.
 - **Area** sidebar: Now (power, rank, is this normal, outlook, largest fires), Calendar (harmonized or raw sensors,
   click a month to select it, shift-click to extend) and Range (comparison with the same dates in every year, fires,
   and CSV exports of every hotspot, daily counts and the monthly calendar).
-- **Who can help** sidebar: pick a scenario and rules, and the plan draws donor routes on the map.
+- **Simulate** sidebar: start from the replay day and add hazards (fire, flood, quake, drought, storm, volcano) to any
+  countries, or pick a scenario like a Mediterranean heatwave. The map switches between power before and after, and
+  the panel shows who falls below 50 and how many firefighters are tied up.
+- **Who can help** sidebar: pick a scenario and rules, and the plan draws donor routes on the map. Simulations and plans
+  lock the screen until the result is in.
 
 Every sidebar opens in a large dialog, and Method explains the harmonization, the index and the plan. The state lives in
 the URL, so a link opens the same area, dates and panels.
