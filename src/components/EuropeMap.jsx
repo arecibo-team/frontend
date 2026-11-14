@@ -95,6 +95,13 @@ function DrawBox({ active, onDraw }) {
       if (rect) map.removeLayer(rect);
       rect = null;
       const r = v => Math.round(v * 100) / 100;
+      const swallow = ev => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      const container = map.getContainer();
+      container.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => container.removeEventListener("click", swallow, { capture: true }), 400);
       if (Math.abs(b.getEast() - b.getWest()) < 0.02 || Math.abs(b.getNorth() - b.getSouth()) < 0.02) return;
       latest.current?.([r(b.getWest()), r(b.getSouth()), r(b.getEast()), r(b.getNorth())]);
     };
