@@ -6,13 +6,6 @@ export default function MethodPage() {
   const metrics = data?.cv_metrics || [];
   return (
     <main className="method">
-      <h1>How Arecibo works</h1>
-      <p>
-        Arecibo puts two questions side by side for every EU country: how unusual is the burning right now, and how much
-        firefighting power does the country still have to meet it. Everything on the map, the history and the plan comes from
-        the same NASA FIRMS hotspot archive and a small set of public statistics.
-      </p>
-
       <h2>One fire record from two satellites</h2>
       <p>
         FIRMS has hotspots from MODIS on Terra and Aqua since November 2000 and from VIIRS on Suomi NPP since January 2012.

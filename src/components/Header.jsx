@@ -1,13 +1,6 @@
 import { useMemo, useState } from "react";
 import { COUNTRY_NAMES } from "../lib/geo.js";
 
-const TABS = [
-  ["map", "Map"],
-  ["history", "History"],
-  ["help", "Who can help"],
-  ["method", "Method"]
-];
-
 export function Logo() {
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -27,7 +20,7 @@ function SearchIcon() {
   );
 }
 
-function Search({ onPick }) {
+export function Search({ onPick }) {
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const matches = useMemo(() => {
@@ -71,27 +64,5 @@ function Search({ onPick }) {
         </ul>
       )}
     </div>
-  );
-}
-
-export default function Header({ page, linkFor, right, onSearch }) {
-  return (
-    <header className="header">
-      <a className="brand" href={linkFor("map")}>
-        <Logo />
-        Arecibo
-      </a>
-      <nav className="nav">
-        {TABS.map(([id, label]) => (
-          <a key={id} href={linkFor(id)} className={page === id ? "active" : ""}>
-            {label}
-          </a>
-        ))}
-      </nav>
-      <div className="header-right">
-        {right}
-        {onSearch && <Search onPick={onSearch} />}
-      </div>
-    </header>
   );
 }

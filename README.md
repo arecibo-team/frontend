@@ -5,19 +5,22 @@ Web app for our NASA Space Apps 2026 entry, *Harmonization of MODIS and VIIRS Ho
 It shows a harmonized MODIS + VIIRS burning calendar for every EU country, how much firefighting power each country has
 left after the hazards it is already dealing with, and which countries could send help.
 
-## Pages
+## How it works
 
-- **Map**: active fires for the replay day, ranked against the 2001–2020 median of the area around them, and an EU map of
-  firefighting power or the Amber index. Click a country for its details, or a bar under the map to change the day.
-- **History**: harmonized burning calendar since 2001 for any area. Pick a country, drag a box on the map, type its
-  edges, or give a point and a distance. Choose any date range with the date fields, the presets or by clicking months
-  in the calendar (shift-click extends). The range card compares the period with the same dates in every other year,
-  shows the daily or monthly series and the fires in it, and exports three CSV files: every hotspot detected, daily
-  counts and the monthly calendar.
-- **Who can help**: pick a country and a scenario, set the rules, and get a plan of who sends what and when it arrives.
-- **Method**: how the harmonization, the index and the plan work.
+One screen built around the EU map.
 
-Every view keeps its state in the URL, so a link opens the same country, day and settings.
+- **Map**: click a country, or press Draw area and drag a box. Coordinates takes a box in degrees, or a point and a
+  distance. The map shows firefighting power or the Amber index for the replay day, with the active fires.
+- **Timeline** under the map: harmonized fire cell-days for the selected area, by day for one year or by month for
+  2001–2025. Drag across it to select a date range, click a day to replay it.
+- **Active fires** sidebar: every fire on the replay day, ranked against the 2001–2020 median of the area around it.
+- **Area** sidebar: Now (power, rank, is this normal, outlook, largest fires), Calendar (harmonized or raw sensors,
+  click a month to select it, shift-click to extend) and Range (comparison with the same dates in every year, fires,
+  and CSV exports of every hotspot, daily counts and the monthly calendar).
+- **Who can help** sidebar: pick a scenario and rules, and the plan draws donor routes on the map.
+
+Every sidebar opens in a large dialog, and Method explains the harmonization, the index and the plan. The state lives in
+the URL, so a link opens the same area, dates and panels.
 
 ## Running it
 
