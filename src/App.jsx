@@ -4,9 +4,13 @@ import Segmented from "./components/Segmented.jsx";
 import Sidebar, { Dialog } from "./components/Sidebar.jsx";
 import Timeline from "./components/Timeline.jsx";
 import { Logo, Search } from "./components/Header.jsx";
+import Icon from "./components/Icon.jsx";
 import AreaPanel from "./panels/AreaPanel.jsx";
 import CoordsForm from "./panels/CoordsForm.jsx";
 import FiresPanel from "./panels/FiresPanel.jsx";
+import SimPanel from "./panels/SimPanel.jsx";
+import Busy, { useMinPending } from "./components/Busy.jsx";
+import { ALERT_COLOR, HAZARD_NAME, STORIES, decodeShocks, encodeShocks, toRequest } from "./lib/sim.js";
 import HelpPanel from "./panels/HelpPanel.jsx";
 import MethodPage from "./panels/Method.jsx";
 import { api } from "./lib/api.js";
@@ -40,7 +44,7 @@ function useParams() {
 
 const EU_BOX = "-32,27,45,72";
 
-function MapLegend({ layer, help }) {
+function MapLegend({ layer, help, title, bubbles = true }) {
   if (help) {
     return (
       <div className="map-legend floating">
@@ -56,11 +60,11 @@ function MapLegend({ layer, help }) {
   return (
     <div className="map-legend floating">
       <div>
-        <div className="legend-title">{power ? "Power" : "Amber index"}</div>
+        <div className="legend-title">{title || (power ? "Power" : "Amber index")}</div>
         <div className="ramp">{colors.map(c => <span key={c} style={{ background: c }} />)}</div>
         <div className="ramp-ticks">{steps.map(s => <span key={s}>{s}</span>)}</div>
       </div>
-      <div>
+      {bubbles && <div>
         <div className="legend-title">Hotspots, 24 h</div>
         <div className="bubbles">
           {[50, 500, 1200].map(v => (
@@ -70,7 +74,7 @@ function MapLegend({ layer, help }) {
             </span>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -79,7 +83,7 @@ function CopyLink() {
   const [done, setDone] = useState(false);
   return (
     <button
-      className="btn btn-small"
+      className="text-btn"
       type="button"
       onClick={async () => {
         try {
@@ -91,6 +95,7 @@ function CopyLink() {
         }
       }}
     >
+      <Icon name="link" />
       {done ? "Copied" : "Copy link"}
     </button>
   );
@@ -104,7 +109,7 @@ export default function App() {
   const showFires = params.fires !== "0";
   const filter = ["above", "watch"].includes(params.filter) ? params.filter : "all";
   const left = params.left !== "0";
-  const right = params.right === "help" ? "help" : params.right === "0" ? null : "area";
+  const right = ["help", "sim"].includes(params.right) ? params.right : params.right === "0" ? null : "area";
   const mode = params.mode === "raw" ? "raw" : "harmonized";
   const [drawing, setDrawing] = useState(false);
   const [dialog, setDialog] = useState(null);
@@ -161,6 +166,25 @@ export default function App() {
       fast: form.fastest ? undefined : "0"
     });
 
+  const [draft, setDraft] = useState(() => {
+    const d = decodeShocks(params.sim);
+    return d.length ? d : STORIES[0].shocks;
+  });
+  const [simNonce, setSimNonce] = useState(0);
+  const simKey = right === "sim" && params.sim ? `${params.sim}|${replayDate}|${simNonce}` : null;
+  const sim = useFetch(
+    () => (simKey ? api.simulate(toRequest(decodeShocks(params.sim), replayDate)) : Promise.resolve(null)),
+    [simKey]
+  );
+  const runSim = list => {
+    setDraft(list);
+    setSimNonce(n => n + 1);
+    setParams({ sim: encodeShocks(list), view: undefined });
+  };
+  const simView = params.view === "before" ? "before" : "after";
+  const busySim = useMinPending(Boolean(simKey) && sim.loading, 1100);
+  const busyPlan = useMinPending(Boolean(helpKey) && plan.loading, 1100);
+
   const rd = replay.data;
   const byIso = useMemo(() => Object.fromEntries((rd?.countries || []).map(c => [c.iso2, c])), [rd]);
   const fires = rd?.fires || [];
@@ -170,8 +194,24 @@ export default function App() {
   const country = iso2 && byIso[iso2] ? { ...byIso[iso2], ref: rd.reference_date } : null;
 
   const p = right === "help" ? plan.data : null;
+  const s = right === "sim" && simKey ? sim.data : null;
+  const simRows = s ? Object.fromEntries(s.rows.map(r => [r.iso2, r])) : null;
+  const simShocks = s ? decodeShocks(params.sim) : [];
+  const badges = [];
+  const perCountry = {};
+  simShocks.forEach(x => {
+    const at = CENTROIDS[x.iso2];
+    if (!at) return;
+    const row = (perCountry[x.iso2] = (perCountry[x.iso2] || 0) + 1) - 1;
+    badges.push({ key: `${x.iso2}-${row}`, lat: at[0], lon: at[1], row, color: ALERT_COLOR[x.alert], label: `${HAZARD_NAME[x.type]}${x.count > 1 ? ` ×${x.count}` : ""}` });
+  });
   const donors = p ? Object.fromEntries(p.donors.map(d => [d.iso2, d])) : {};
   const fill = code => {
+    if (simRows) {
+      const r = simRows[code];
+      if (!r) return "#dfe3e8";
+      return classColor(simView === "before" ? r.power_before : r.power_after, POWER_STEPS, POWER_COLORS);
+    }
     if (p) {
       if (donors[code]) return classColor(donors[code].power_before, POWER_STEPS, POWER_COLORS);
       if (code === p.recipient.iso2) return classColor(p.recipient.power_with_help, POWER_STEPS, POWER_COLORS);
@@ -221,16 +261,29 @@ export default function App() {
           <button className="icon-btn" type="button" aria-label="Next day" onClick={() => setDay(addDays(replayDate, 1))} disabled={replayDate >= DATA_TO}>›</button>
         </div>
         <div className="header-right">
-          <button className={`btn btn-small${left ? " btn-on" : ""}`} type="button" onClick={() => setParams({ left: left ? "0" : undefined })}>
-            Fires{rd ? ` · ${rd.counts.all}` : ""}
+          <nav className="panel-nav" aria-label="Panels">
+            <button className={left ? "on" : ""} type="button" aria-pressed={left} onClick={() => setParams({ left: left ? "0" : undefined })}>
+              <Icon name="flame" />
+              Fires
+              {rd && <span className="count">{rd.counts.all}</span>}
+            </button>
+            <button className={right === "area" ? "on" : ""} type="button" aria-pressed={right === "area"} onClick={() => setParams({ right: right === "area" ? "0" : undefined })}>
+              <Icon name="area" />
+              {areaTitle}
+            </button>
+            <button className={right === "sim" ? "on" : ""} type="button" aria-pressed={right === "sim"} onClick={() => setParams({ right: right === "sim" ? undefined : "sim" })}>
+              <Icon name="pulse" />
+              Simulate
+            </button>
+            <button className={right === "help" ? "on" : ""} type="button" aria-pressed={right === "help"} onClick={() => setParams({ right: right === "help" ? undefined : "help" })}>
+              <Icon name="help" />
+              Who can help
+            </button>
+          </nav>
+          <button className="text-btn" type="button" onClick={() => setDialog("method")}>
+            <Icon name="book" />
+            Method
           </button>
-          <button className={`btn btn-small${right === "area" ? " btn-on" : ""}`} type="button" onClick={() => setParams({ right: right === "area" ? "0" : undefined })}>
-            {areaTitle}
-          </button>
-          <button className={`btn btn-small${right === "help" ? " btn-on" : ""}`} type="button" onClick={() => setParams({ right: right === "help" ? undefined : "help" })}>
-            Who can help
-          </button>
-          <button className="btn btn-small" type="button" onClick={() => setDialog("method")}>Method</button>
           <CopyLink />
           <Search onPick={selectCountry} />
         </div>
@@ -253,29 +306,39 @@ export default function App() {
 
         <div className="stage">
           <div className="map-toolbar">
-            {right !== "help" && (
+            {s ? (
+              <Segmented options={[["before", "Before"], ["after", "After"]]} value={simView} onChange={v => setParams({ view: v === "after" ? undefined : v })} label="Simulation view" />
+            ) : right !== "help" ? (
               <Segmented options={[["power", "Power"], ["amber", "Amber index"]]} value={layer} onChange={v => setParams({ layer: v === "power" ? undefined : v })} label="Map layer" />
+            ) : null}
+            {!s && !p && (
+              <label className="check check-ink">
+                <input type="checkbox" checked={showFires} onChange={e => setParams({ fires: e.target.checked ? undefined : "0" })} />
+                Fires
+              </label>
             )}
-            <label className="check check-ink">
-              <input type="checkbox" checked={showFires} onChange={e => setParams({ fires: e.target.checked ? undefined : "0" })} />
-              Fires
-            </label>
-            <button className={`btn btn-small${drawing ? " btn-on" : ""}`} type="button" onClick={() => setDrawing(d => !d)}>
+            <span className="tool-sep" />
+            <button className={`tool${drawing ? " on" : ""}`} type="button" aria-pressed={drawing} onClick={() => setDrawing(d => !d)}>
+              <Icon name="draw" />
               {drawing ? "Cancel" : "Draw area"}
             </button>
-            <button className="btn btn-small" type="button" onClick={() => setDialog("coords")}>Coordinates</button>
+            <button className="tool" type="button" onClick={() => setDialog("coords")}>
+              <Icon name="target" />
+              Coordinates
+            </button>
           </div>
           {replay.error && <p className="notice floating-notice">Could not load {longDate(replayDate)}: {replay.error.message}</p>}
           <EuropeMap
             fill={fill}
-            selected={p ? p.recipient.iso2 : iso2}
-            outline={p ? p.donors.map(d => d.iso2) : []}
+            selected={s ? null : p ? p.recipient.iso2 : iso2}
+            outline={s ? [...new Set(simShocks.map(x => x.iso2))] : p ? p.donors.map(d => d.iso2) : []}
+            badges={badges}
             hatch={p ? p.left_out.map(l => l.iso2) : []}
             routes={p ? routesFor(p) : []}
             incident={p ? p.incident : null}
             onSelect={drawing ? undefined : selectCountry}
-            fires={showFires && !p ? fires : []}
-            callout={showFires && !p && calloutFire ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)}× the ${month} median` } : null}
+            fires={showFires && !p && !s ? fires : []}
+            callout={showFires && !p && !s && calloutFire ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)}× the ${month} median` } : null}
             flyTo={selectedFire ? [selectedFire.lat, selectedFire.lon] : null}
             focus={p ? [p.incident, ...p.donors.map(d => CENTROIDS[d.iso2]).filter(Boolean)] : box ? [[box[1], box[0]], [box[3], box[2]]] : null}
             flyOnSelect
@@ -284,7 +347,7 @@ export default function App() {
             box={box}
             ariaLabel="Map of the EU"
           />
-          <MapLegend layer={layer} help={Boolean(p)} />
+          <MapLegend layer={s ? "power" : layer} help={Boolean(p)} title={s ? `Power, ${simView}` : null} bubbles={showFires && !s} />
         </div>
 
         {right === "area" && (
@@ -304,6 +367,22 @@ export default function App() {
                 query={query}
                 setParams={setParams}
                 onHelp={() => setParams({ right: "help", hc: iso2 })}
+              />
+            )}
+          </Sidebar>
+        )}
+        {right === "sim" && (
+          <Sidebar side="right" title="Simulate" sub={`Starting from ${longDate(replayDate)}`} onClose={() => setParams({ right: undefined })} width={400}>
+            {wide => (
+              <SimPanel
+                draft={draft}
+                setDraft={setDraft}
+                onRun={runSim}
+                result={s}
+                error={sim.error}
+                loading={sim.loading}
+                wide={wide}
+                onHelp={code => setParams({ right: "help", hc: code })}
               />
             )}
           </Sidebar>
@@ -329,6 +408,9 @@ export default function App() {
         onRange={(a, b) => setParams({ from: a, to: b, right: right === "help" ? "help" : undefined, tab: "range" })}
         onDay={setDay}
       />
+
+      <Busy show={busySim} title="Running the simulation" steps={["Adding the hazards to each country", "Recomputing the Amber index", "Committing crews and power", "Ranking the EU"]} />
+      <Busy show={busyPlan && !busySim} title="Planning assistance" steps={["Checking who has power to spare", "Solving the assignment", "Timing the routes"]} />
 
       {dialog === "method" && (
         <Dialog title="Method" onClose={() => setDialog(null)}>
