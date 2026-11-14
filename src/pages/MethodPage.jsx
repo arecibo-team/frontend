@@ -100,7 +100,7 @@ export default function MethodPage() {
         <li>OpenStreetMap fire stations through the Overpass API</li>
         <li>GWIS burned area through Our World in Data, used to train the index model</li>
         <li>GeoNames cities500 for fire names</li>
-        <li>Natural Earth country shapes through world-atlas</li>
+        <li>Natural Earth 1:10m country shapes</li>
       </ul>
       <p className="small">
         We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System
