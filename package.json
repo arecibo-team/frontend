@@ -1,7 +1,7 @@
 {
-  "name": "europe-wildfire-map",
+  "name": "arecibo",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,14 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@maplibre/maplibre-gl-leaflet": "^0.0.22",
-    "leaflet": "^1.9.4",
-    "lineclip": "^2.0.0",
-    "maplibre-gl": "^4.7.1",
-    "polylabel": "^2.1.0",
+    "d3-geo": "^3.1.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-leaflet": "^5.0.0",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
