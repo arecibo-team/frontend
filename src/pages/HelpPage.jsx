@@ -34,7 +34,12 @@ function mainland(feature) {
   return geoCentroid(parts[0]);
 }
 
-const CENTROIDS = Object.fromEntries(COUNTRIES.filter(f => f.iso2).map(f => [f.iso2, mainland(f)]));
+const CENTROIDS = Object.fromEntries(
+  COUNTRIES.filter(f => f.iso2).map(f => {
+    const [lon, lat] = mainland(f);
+    return [f.iso2, [lat, lon]];
+  })
+);
 
 function Scenario({ form, setForm, onRun, busy }) {
   const names = Object.entries(COUNTRY_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
@@ -210,7 +215,7 @@ export default function HelpPage({ params, setParams }) {
 
   const donors = useMemo(() => Object.fromEntries((plan?.donors || []).map(d => [d.iso2, d])), [plan]);
   const leftOut = (plan?.left_out || []).map(l => l.iso2);
-  const incident = plan ? [plan.incident[1], plan.incident[0]] : null;
+  const incident = plan ? plan.incident : null;
   const routes = (plan?.donors || []).map((d, i, all) => ({
     from: CENTROIDS[d.iso2],
     to: incident,
@@ -241,10 +246,10 @@ export default function HelpPage({ params, setParams }) {
           fill={fill}
           selected={plan?.recipient.iso2}
           outline={plan ? plan.donors.map(d => d.iso2) : []}
-          dimNonEu="#dfe4ec"
           hatch={leftOut}
           routes={plan ? routes : []}
           incident={incident}
+          focus={plan ? [incident, ...plan.donors.map(d => CENTROIDS[d.iso2]).filter(Boolean)] : null}
           ariaLabel="Countries sending help and their routes"
         />
         <div className="help-legend">

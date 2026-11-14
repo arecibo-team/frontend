@@ -208,6 +208,8 @@ export default function MapPage({ params, setParams, go }) {
               ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)} times the ${month} median` }
               : null
           }
+          flyTo={selectedFire ? [selectedFire.lat, selectedFire.lon] : null}
+          flyOnSelect
           ariaLabel={layer === "power" ? "Firefighting power by EU country" : "Amber index by EU country"}
         />
         <Legend layer={layer} />
