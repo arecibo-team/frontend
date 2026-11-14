@@ -1,5 +1,5 @@
 import { feature } from "topojson-client";
-import { geoBounds, geoConicConformal, geoPath } from "d3-geo";
+import { geoBounds } from "d3-geo";
 import world from "world-atlas/countries-50m.json";
 
 export const EU = {
@@ -27,23 +27,6 @@ export const COUNTRIES = all
     return e >= VIEW.west && w <= VIEW.east && n >= VIEW.south && s <= VIEW.north;
   })
   .map(f => ({ ...f, iso2: EU[f.id] || null }));
-
-const FRAME = {
-  type: "MultiPoint",
-  coordinates: [
-    [-24.5, 63.5], [-10, 71], [10, 71.5], [31, 71], [33, 60],
-    [34, 45], [34, 34.2], [20, 34], [5, 35], [-10, 34.5], [-15, 40]
-  ]
-};
-
-export function makeProjection(width, height, pad = 8) {
-  return geoConicConformal()
-    .parallels([38, 62])
-    .rotate([-12, 0])
-    .fitExtent([[pad, pad], [width - pad, height - pad]], FRAME);
-}
-
-export const pathFor = projection => geoPath(projection);
 
 export const POWER_STEPS = [35, 50, 65, 80];
 export const POWER_COLORS = ["#e6edf6", "#c3d4e8", "#8faed4", "#4e7eb3", "#244f80"];

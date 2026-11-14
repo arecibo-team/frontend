@@ -1,28 +1,117 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { COUNTRIES, COUNTRY_NAMES, fireRadius, makeProjection, pathFor } from "../lib/geo.js";
+import { useEffect, useMemo, useState } from "react";
+import { CircleMarker, MapContainer, Marker, Pane, Polyline, ScaleControl, ZoomControl, useMap } from "react-leaflet";
+import L from "leaflet";
+import { BASEMAPS, EUROPE_BOUNDS, FLY_DURATION, HOME_BOUNDS, MAX_ZOOM, basemapHasOwnLabels } from "../config.js";
+import { fireRadius } from "../lib/geo.js";
+import MinZoomLock from "./MinZoomLock.jsx";
+import Basemap from "./Basemap.jsx";
+import CountriesLayer from "./CountriesLayer.jsx";
+import CountryLabels from "./CountryLabels.jsx";
+import LayerSwitcher from "./LayerSwitcher.jsx";
+import ResetViewButton from "./ResetViewButton.jsx";
 
-function useSize(ref) {
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    if (!ref.current) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setSize({ width: Math.round(width), height: Math.round(height) });
-    });
-    ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, [ref]);
-  return size;
+const STORE = "arecibo.map";
+
+function loadPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || "{}");
+    return {
+      basemap: BASEMAPS.some(b => b.id === saved.basemap) ? saved.basemap : BASEMAPS[0].id,
+      bordersOn: saved.bordersOn !== false,
+      namesOn: saved.namesOn !== false
+    };
+  } catch {
+    return { basemap: BASEMAPS[0].id, bordersOn: true, namesOn: true };
+  }
 }
 
-function curve(a, b, bend = 0.18) {
-  const mx = (a[0] + b[0]) / 2;
-  const my = (a[1] + b[1]) / 2;
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const cx = mx - dy * bend;
-  const cy = my + dx * bend;
-  return `M${a[0]},${a[1]} Q${cx},${cy} ${b[0]},${b[1]}`;
+function HatchPattern() {
+  const map = useMap();
+  useEffect(() => {
+    const add = () => {
+      const svg = map.getPane("overlayPane")?.querySelector("svg");
+      if (!svg || svg.querySelector("#map-hatch")) return;
+      const ns = "http://www.w3.org/2000/svg";
+      const defs = document.createElementNS(ns, "defs");
+      defs.innerHTML =
+        '<pattern id="map-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        '<rect width="6" height="6" fill="#eef0f3"/><line x1="0" y1="0" x2="0" y2="6" stroke="#b9bec6" stroke-width="1.4"/></pattern>';
+      svg.insertBefore(defs, svg.firstChild);
+    };
+    add();
+    map.on("layeradd", add);
+    return () => map.off("layeradd", add);
+  }, [map]);
+  return null;
+}
+
+function KeepHomeView() {
+  const map = useMap();
+  useEffect(() => {
+    let touched = false;
+    const mark = () => (touched = true);
+    const refit = () => {
+      if (!touched) map.fitBounds(HOME_BOUNDS, { animate: false });
+    };
+    const container = map.getContainer();
+    container.addEventListener("pointerdown", mark);
+    container.addEventListener("wheel", mark, { passive: true });
+    container.addEventListener("keydown", mark);
+    map.on("resize", refit);
+    const timer = setTimeout(refit, 0);
+    return () => {
+      clearTimeout(timer);
+      container.removeEventListener("pointerdown", mark);
+      container.removeEventListener("wheel", mark);
+      container.removeEventListener("keydown", mark);
+      map.off("resize", refit);
+    };
+  }, [map]);
+  return null;
+}
+
+function FitTo({ points }) {
+  const map = useMap();
+  const key = JSON.stringify(points);
+  useEffect(() => {
+    if (!points || points.length < 2) return;
+    map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 6, duration: FLY_DURATION });
+  }, [map, key]);
+  return null;
+}
+
+function FlyTo({ target }) {
+  const map = useMap();
+  const key = target ? target.join(",") : "";
+  useEffect(() => {
+    if (target) map.flyTo(target, Math.max(map.getZoom(), 6), { duration: FLY_DURATION });
+  }, [map, key]);
+  return null;
+}
+
+function curve(from, to, bend = 0.2, steps = 32) {
+  const [lat1, lon1] = from;
+  const [lat2, lon2] = to;
+  const cLat = (lat1 + lat2) / 2 + (lon2 - lon1) * bend;
+  const cLon = (lon1 + lon2) / 2 - (lat2 - lat1) * bend;
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const a = (1 - t) ** 2;
+    const b = 2 * (1 - t) * t;
+    const c = t ** 2;
+    pts.push([a * lat1 + b * cLat + c * lat2, a * lon1 + b * cLon + c * lon2]);
+  }
+  return pts;
+}
+
+function calloutIcon(title, sub) {
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+  return L.divIcon({
+    className: "map-callout",
+    iconSize: null,
+    html: `<svg width="46" height="40"><line x1="0" y1="40" x2="42" y2="4" stroke="#18181b" stroke-width="1"/></svg><div><b>${esc(title)}</b><span>${esc(sub)}</span></div>`
+  });
 }
 
 export default function EuropeMap({
@@ -35,105 +124,96 @@ export default function EuropeMap({
   callout,
   routes = [],
   incident,
-  dimNonEu = "#e4e6ea",
+  focus,
+  flyTo,
+  flyOnSelect = false,
   ariaLabel = "Map of the EU"
 }) {
-  const box = useRef(null);
-  const { width, height } = useSize(box);
-  const projection = useMemo(() => (width && height ? makeProjection(width, height) : null), [width, height]);
-  const path = useMemo(() => (projection ? pathFor(projection) : null), [projection]);
-  const shapes = useMemo(
-    () => (path ? COUNTRIES.map((f, i) => ({ key: `${f.id || "x"}-${i}`, iso2: f.iso2, d: path(f) })).filter(s => s.d) : []),
-    [path]
-  );
-  const [hover, setHover] = useState(null);
-
-  const outlined = new Set([...(selected ? [selected] : []), ...outline]);
-  const hatched = new Set(hatch);
-  const project = (lon, lat) => projection([lon, lat]);
+  const [prefs, setPrefs] = useState(loadPrefs);
+  const set = patch =>
+    setPrefs(p => {
+      const next = { ...p, ...patch };
+      try {
+        localStorage.setItem(STORE, JSON.stringify(next));
+      } catch {
+        return next;
+      }
+      return next;
+    });
+  const tone = BASEMAPS.find(b => b.id === prefs.basemap)?.labelTone === "dark" ? " labels-dark" : "";
+  const icon = useMemo(() => (callout ? calloutIcon(callout.title, callout.sub) : null), [callout?.title, callout?.sub]);
 
   return (
-    <div className="map-box" ref={box}>
-      {projection && (
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
-          <defs>
-            <clipPath id="map-frame">
-              <rect x="0" y="0" width={width} height={height} />
-            </clipPath>
-            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect width="6" height="6" fill="#eef0f3" />
-              <line x1="0" y1="0" x2="0" y2="6" stroke="#c9cdd3" strokeWidth="1.2" />
-            </pattern>
-            <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M0,0 L8,4 L0,8" fill="none" stroke="#18181b" strokeWidth="1.3" />
-            </marker>
-          </defs>
-          <g clipPath="url(#map-frame)">
-            {shapes.map(s => {
-              const eu = Boolean(s.iso2);
-              const color = eu ? fill(s.iso2) : dimNonEu;
-              return (
-                <path
-                  key={s.key}
-                  d={s.d}
-                  fill={hatched.has(s.iso2) ? "url(#hatch)" : color}
-                  stroke="#ffffff"
-                  strokeWidth={eu ? 0.8 : 0.6}
-                  strokeLinejoin="round"
-                  style={{ cursor: eu && onSelect ? "pointer" : "default" }}
-                  opacity={eu && hover && hover !== s.iso2 && onSelect ? 0.92 : 1}
-                  onMouseEnter={() => eu && setHover(s.iso2)}
-                  onMouseLeave={() => setHover(null)}
-                  onClick={() => eu && onSelect && onSelect(s.iso2)}
-                >
-                  {eu && <title>{COUNTRY_NAMES[s.iso2]}</title>}
-                </path>
-              );
-            })}
-            {shapes
-              .filter(s => outlined.has(s.iso2))
-              .map(s => (
-                <path key={`o-${s.key}`} d={s.d} fill="none" stroke="#18181b" strokeWidth="1.6" strokeLinejoin="round" pointerEvents="none" />
-              ))}
-            {routes.map((r, i) => {
-              const a = project(...r.from);
-              const b = project(...r.to);
-              return (
-                <g key={`r-${i}`} pointerEvents="none">
-                  <path d={curve(a, b)} fill="none" stroke="#18181b" strokeWidth={r.width} strokeDasharray="5 4" markerEnd="url(#arrow)" />
-                  <circle cx={a[0]} cy={a[1]} r="3.4" fill="#18181b" />
-                </g>
-              );
-            })}
-            {fires.map(f => {
-              const [x, y] = project(f.lon, f.lat);
-              const r = fireRadius(f.hotspots_24h);
-              return (
-                <g key={f.id} pointerEvents="none">
-                  <circle cx={x} cy={y} r={r} fill="rgba(217,72,15,0.16)" stroke="#d9480f" strokeWidth="1.2" />
-                  <circle cx={x} cy={y} r="3" fill="#d9480f" />
-                </g>
-              );
-            })}
-            {incident && (() => {
-              const [x, y] = project(...incident);
-              return <circle cx={x} cy={y} r="6" fill="#d9480f" stroke="#fff" strokeWidth="1.5" pointerEvents="none" />;
-            })()}
-            {callout && (() => {
-              const [x, y] = project(callout.lon, callout.lat);
-              const lx = x + 46;
-              const ly = y - 40;
-              return (
-                <g pointerEvents="none">
-                  <line x1={x} y1={y} x2={lx - 4} y2={ly + 2} stroke="#18181b" strokeWidth="1" />
-                  <text x={lx} y={ly - 6} className="callout-name">{callout.title}</text>
-                  <text x={lx} y={ly + 12} className="callout-sub">{callout.sub}</text>
-                </g>
-              );
-            })()}
-          </g>
-        </svg>
-      )}
+    <div className={`map-box${tone}`} role="region" aria-label={ariaLabel}>
+      <MapContainer
+        className="map"
+        bounds={HOME_BOUNDS}
+        maxBounds={EUROPE_BOUNDS}
+        maxBoundsViscosity={1.0}
+        maxZoom={MAX_ZOOM}
+        zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={90}
+        wheelDebounceTime={20}
+        inertia
+        inertiaDeceleration={2500}
+        fadeAnimation={false}
+        zoomControl={false}
+        attributionControl
+      >
+        <ZoomControl position="bottomright" />
+        <ScaleControl position="bottomright" imperial={false} />
+        <MinZoomLock />
+        <KeepHomeView />
+        <Basemap basemap={prefs.basemap} />
+        <HatchPattern />
+        <CountriesLayer
+          fill={fill}
+          outline={outline}
+          hatch={hatch}
+          selected={selected}
+          bordersOn={prefs.bordersOn}
+          onSelect={onSelect}
+          flyOnSelect={flyOnSelect}
+        />
+        <CountryLabels visible={prefs.namesOn && basemapHasOwnLabels(prefs.basemap)} />
+        <Pane name="marks" style={{ zIndex: 620, pointerEvents: "none" }}>
+          {routes.map((r, i) =>
+            r.from && r.to ? (
+              <Polyline key={`r-${i}`} positions={curve(r.from, r.to)} pathOptions={{ color: "#18181b", weight: r.width, dashArray: "6 5", interactive: false }} />
+            ) : null
+          )}
+          {routes.map((r, i) =>
+            r.from ? <CircleMarker key={`o-${i}`} center={r.from} radius={3.5} pathOptions={{ color: "#18181b", fillColor: "#18181b", fillOpacity: 1, weight: 0 }} /> : null
+          )}
+          {fires.map(f => (
+            <CircleMarker
+              key={f.id}
+              center={[f.lat, f.lon]}
+              radius={fireRadius(f.hotspots_24h)}
+              pathOptions={{ color: "#d9480f", weight: 1.2, fillColor: "#d9480f", fillOpacity: 0.16, interactive: false }}
+            />
+          ))}
+          {fires.map(f => (
+            <CircleMarker key={`c-${f.id}`} center={[f.lat, f.lon]} radius={3} pathOptions={{ color: "#d9480f", weight: 0, fillColor: "#d9480f", fillOpacity: 1, interactive: false }} />
+          ))}
+          {incident && <CircleMarker center={incident} radius={7} pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#d9480f", fillOpacity: 1, interactive: false }} />}
+        </Pane>
+        <Pane name="callout" style={{ zIndex: 700, pointerEvents: "none" }}>
+          {callout && icon && <Marker position={[callout.lat, callout.lon]} icon={icon} interactive={false} keyboard={false} />}
+        </Pane>
+        <FitTo points={focus} />
+        <FlyTo target={flyTo} />
+        <ResetViewButton />
+        <LayerSwitcher
+          basemap={prefs.basemap}
+          onBasemapChange={basemap => set({ basemap })}
+          bordersOn={prefs.bordersOn}
+          onBordersChange={bordersOn => set({ bordersOn })}
+          namesOn={prefs.namesOn}
+          onNamesChange={namesOn => set({ namesOn })}
+        />
+      </MapContainer>
     </div>
   );
 }
