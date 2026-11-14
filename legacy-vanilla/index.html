@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Europe Wildfire Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h1>Europe Wildfire Monitor</h1>
+    </div>
+    <div class="topbar-controls">
+      <label class="field">
+        <span>Year</span>
+        <select id="year"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-col">
+      <div class="map-wrap">
+        <div id="map" aria-label="Map of Europe"></div>
+        <button class="map-btn" id="reset" title="Reset view to Europe">Reset view</button>
+      </div>
+
+      <div class="strip">
+        <div class="timeline">
+          <button class="icon-btn" id="play" title="Play through the year" aria-label="Play">▶</button>
+          <input type="range" id="day" min="1" max="365" step="1" aria-label="Day of year">
+          <output id="date-label">—</output>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="status" id="status">Loading…</div>
+      </div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+
+<script src="js/config.js"></script>
+<script src="js/data/mockPredictions.js"></script>
+<script src="js/map.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/country.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
