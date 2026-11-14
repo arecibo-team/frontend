@@ -18,10 +18,22 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+export function areaQuery({ country, box, from, to, asof }) {
+  const q = new URLSearchParams();
+  if (box) q.set("bbox", box);
+  else q.set("country", country);
+  if (from) q.set("start", from);
+  if (to) q.set("end", to);
+  if (asof) q.set("asof", asof);
+  return q.toString();
+}
+
 export const api = {
   replay: date => request(`/replay?date=${date}`),
   history: (iso2, date) => request(`/history/${iso2}?date=${date}`),
   historyCsvUrl: (iso2, date) => `${API_URL}/history/${iso2}.csv?date=${date}`,
+  area: q => request(`/area?${areaQuery(q)}`),
+  areaCsvUrl: (kind, q) => `${API_URL}/area/${kind}.csv?${areaQuery(q)}`,
   plan: body => request("/plan", { method: "POST", body: JSON.stringify(body) }),
   model: () => request("/model"),
   health: () => request("/health"),

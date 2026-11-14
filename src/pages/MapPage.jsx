@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import EuropeMap from "../components/EuropeMap.jsx";
 import DayBars from "../components/DayBars.jsx";
 import Segmented from "../components/Segmented.jsx";
@@ -167,6 +167,7 @@ export default function MapPage({ params, setParams, go }) {
   const selectedFire = fires.find(f => f.id === params.fire) || null;
   const calloutFire = selectedFire || fires.filter(f => f.iso2 === selected).sort((a, b) => b.ratio - a.ratio)[0];
   const month = data ? MONTHS[Number(data.date.slice(5, 7)) - 1] : "";
+  const [drawing, setDrawing] = useState(false);
 
   const fill = iso2 => {
     const c = byIso[iso2];
@@ -196,12 +197,17 @@ export default function MapPage({ params, setParams, go }) {
             <input type="checkbox" checked={showFires} onChange={e => setParams({ fires: e.target.checked ? undefined : "0" })} />
             Fires
           </label>
+          <button className={`btn btn-small${drawing ? " btn-on" : ""}`} type="button" onClick={() => setDrawing(d => !d)}>
+            {drawing ? "Cancel" : "Draw an area"}
+          </button>
         </div>
         {error && <p className="notice">Could not load the replay: {error.message}</p>}
         <EuropeMap
           fill={fill}
           selected={selected}
-          onSelect={iso2 => setParams({ c: iso2, fire: undefined })}
+          onSelect={drawing ? undefined : iso2 => setParams({ c: iso2, fire: undefined })}
+          drawing={drawing}
+          onDraw={b => go("history", { box: b.join(","), c: undefined, date })}
           fires={showFires ? fires : []}
           callout={
             showFires && calloutFire

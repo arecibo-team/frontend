@@ -7,6 +7,7 @@ import MethodPage from "./pages/MethodPage.jsx";
 import { api } from "./lib/api.js";
 import { longDate } from "./lib/format.js";
 import { DEFAULT_DATE, buildHash, navigate, replaceParams, useRoute } from "./lib/router.js";
+import { areaParams } from "./pages/HistoryPage.jsx";
 
 function CopyLink() {
   const [done, setDone] = useState(false);
@@ -28,7 +29,9 @@ function CopyLink() {
 
 export default function App() {
   const { page, params: raw } = useRoute();
-  const params = { ...raw, date: raw.date || DEFAULT_DATE };
+  const replayFloor = "2012-01-20";
+  const date = raw.date || DEFAULT_DATE;
+  const params = { ...raw, date: page === "history" ? date : date < replayFloor ? replayFloor : date > "2025-12-31" ? "2025-12-31" : date };
   const shared = { date: params.date !== DEFAULT_DATE ? params.date : undefined, c: params.c };
 
   const setParams = patch => replaceParams(page, { ...raw, ...patch });
@@ -40,9 +43,10 @@ export default function App() {
 
   let right = <span className="replaying">Replaying {longDate(params.date)}</span>;
   if (page === "history") {
+    const a = areaParams(params);
     right = (
       <>
-        <a className="btn" href={api.historyCsvUrl(params.c || "GR", params.date)} download>
+        <a className="btn" href={api.areaCsvUrl("calendar", { country: a.iso2, box: a.box?.join(","), from: a.from, to: a.to, asof: a.asof })} download>
           Download CSV
         </a>
         <CopyLink />

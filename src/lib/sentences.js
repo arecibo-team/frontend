@@ -2,6 +2,8 @@ import { MONTHS, ordinal } from "./format.js";
 
 export function normalSentence(n, country, { answer = true } = {}) {
   const month = MONTHS[n.month - 1];
+  if (!n.value) return `${answer ? "Yes. " : ""}No burning detected in ${country} so far in ${month} ${n.year}.`;
+  if (n.median < 1) return `${answer ? "No. " : ""}${month} usually sees almost no burning in ${country}, and ${month} ${n.year} already has ${n.value} cell-days.`;
   const times = `${Number(n.ratio).toFixed(1)} times the median`;
   const which = n.rank === 1 ? "the most" : `the ${ordinal(n.rank)} most`;
   if (n.rank <= 3 && n.ratio >= 1) {
@@ -22,6 +24,8 @@ export function normalSentence(n, country, { answer = true } = {}) {
 
 export function historySentence(n) {
   const month = MONTHS[n.month - 1];
+  if (!n.value) return `No burning detected so far in ${month} ${n.year}`;
+  if (n.median < 1) return `${month} usually sees almost no burning here, and ${month} ${n.year} already has ${n.value} cell-days`;
   const which = n.rank === 1 ? "the most" : `the ${ordinal(n.rank)} most`;
   if (n.rank <= 3 && n.ratio >= 1) return `${month} ${n.year} is ${which} active ${month} since ${n.since}, at ${Number(n.ratio).toFixed(1)} times the median`;
   return `${month} ${n.year} is at ${Number(n.ratio).toFixed(1)} times the ${month} median, ${ordinal(n.rank)} of ${n.years} years since ${n.since}`;

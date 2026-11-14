@@ -9,8 +9,11 @@ left after the hazards it is already dealing with, and which countries could sen
 
 - **Map**: active fires for the replay day, ranked against the 2001–2020 median of the area around them, and an EU map of
   firefighting power or the Amber index. Click a country for its details, or a bar under the map to change the day.
-- **History**: monthly calendar for one country since 2001, with raw sensor counts or the harmonized series, an outlook
-  for the next six weeks and the largest fires since 2012. Download CSV exports the calendar.
+- **History**: harmonized burning calendar since 2001 for any area. Pick a country, drag a box on the map, type its
+  edges, or give a point and a distance. Choose any date range with the date fields, the presets or by clicking months
+  in the calendar (shift-click extends). The range card compares the period with the same dates in every other year,
+  shows the daily or monthly series and the fires in it, and exports three CSV files: every hotspot detected, daily
+  counts and the monthly calendar.
 - **Who can help**: pick a country and a scenario, set the rules, and get a plan of who sends what and when it arrives.
 - **Method**: how the harmonization, the index and the plan work.
 

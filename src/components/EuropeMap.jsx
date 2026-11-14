@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CircleMarker, MapContainer, Marker, Pane, Polyline, ScaleControl, ZoomControl, useMap } from "react-leaflet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CircleMarker, MapContainer, Marker, Pane, Polyline, Rectangle, ScaleControl, ZoomControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import { BASEMAPS, EUROPE_BOUNDS, FLY_DURATION, HOME_BOUNDS, MAX_ZOOM, basemapHasOwnLabels } from "../config.js";
 import { fireRadius } from "../lib/geo.js";
@@ -45,9 +45,10 @@ function HatchPattern() {
   return null;
 }
 
-function KeepHomeView() {
+function KeepHomeView({ enabled }) {
   const map = useMap();
   useEffect(() => {
+    if (!enabled) return;
     let touched = false;
     const mark = () => (touched = true);
     const refit = () => {
@@ -66,7 +67,49 @@ function KeepHomeView() {
       container.removeEventListener("keydown", mark);
       map.off("resize", refit);
     };
-  }, [map]);
+  }, [map, enabled]);
+  return null;
+}
+
+function DrawBox({ active, onDraw }) {
+  const map = useMap();
+  const latest = useRef(onDraw);
+  latest.current = onDraw;
+  useEffect(() => {
+    if (!active) return;
+    map.dragging.disable();
+    map.boxZoom.disable();
+    let start = null;
+    let rect = null;
+    const down = e => {
+      start = e.latlng;
+      rect = L.rectangle([start, start], { color: "#d9480f", weight: 2, dashArray: "6 4", fillOpacity: 0.08, interactive: false }).addTo(map);
+    };
+    const move = e => {
+      if (start && rect) rect.setBounds([start, e.latlng]);
+    };
+    const up = e => {
+      if (!start) return;
+      const b = L.latLngBounds(start, e.latlng);
+      start = null;
+      if (rect) map.removeLayer(rect);
+      rect = null;
+      const r = v => Math.round(v * 100) / 100;
+      if (Math.abs(b.getEast() - b.getWest()) < 0.02 || Math.abs(b.getNorth() - b.getSouth()) < 0.02) return;
+      latest.current?.([r(b.getWest()), r(b.getSouth()), r(b.getEast()), r(b.getNorth())]);
+    };
+    map.on("mousedown", down);
+    map.on("mousemove", move);
+    map.on("mouseup", up);
+    return () => {
+      map.off("mousedown", down);
+      map.off("mousemove", move);
+      map.off("mouseup", up);
+      if (rect) map.removeLayer(rect);
+      map.dragging.enable();
+      map.boxZoom.enable();
+    };
+  }, [map, active]);
   return null;
 }
 
@@ -75,7 +118,7 @@ function FitTo({ points }) {
   const key = JSON.stringify(points);
   useEffect(() => {
     if (!points || points.length < 2) return;
-    map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 6, duration: FLY_DURATION });
+    map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 8, duration: FLY_DURATION });
   }, [map, key]);
   return null;
 }
@@ -127,6 +170,9 @@ export default function EuropeMap({
   focus,
   flyTo,
   flyOnSelect = false,
+  drawing = false,
+  onDraw,
+  box,
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -144,7 +190,8 @@ export default function EuropeMap({
   const icon = useMemo(() => (callout ? calloutIcon(callout.title, callout.sub) : null), [callout?.title, callout?.sub]);
 
   return (
-    <div className={`map-box${tone}`} role="region" aria-label={ariaLabel}>
+    <div className={`map-box${tone}${drawing ? " drawing" : ""}`} role="region" aria-label={ariaLabel}>
+      {drawing && <div className="draw-hint">Drag on the map to draw your area</div>}
       <MapContainer
         className="map"
         bounds={HOME_BOUNDS}
@@ -164,7 +211,7 @@ export default function EuropeMap({
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomright" imperial={false} />
         <MinZoomLock />
-        <KeepHomeView />
+        <KeepHomeView enabled={!focus} />
         <Basemap basemap={prefs.basemap} />
         <HatchPattern />
         <CountriesLayer
@@ -202,6 +249,13 @@ export default function EuropeMap({
         <Pane name="callout" style={{ zIndex: 700, pointerEvents: "none" }}>
           {callout && icon && <Marker position={[callout.lat, callout.lon]} icon={icon} interactive={false} keyboard={false} />}
         </Pane>
+        {box && (
+          <Rectangle
+            bounds={[[box[1], box[0]], [box[3], box[2]]]}
+            pathOptions={{ color: "#d9480f", weight: 2, dashArray: "6 4", fillOpacity: 0.06, interactive: false }}
+          />
+        )}
+        <DrawBox active={drawing} onDraw={onDraw} />
         <FitTo points={focus} />
         <FlyTo target={flyTo} />
         <ResetViewButton />
