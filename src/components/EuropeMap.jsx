@@ -164,6 +164,15 @@ function calloutIcon(title, sub) {
   });
 }
 
+const badgeCache = new Map();
+function badgeIcon({ label, color, row }) {
+  const k = `${label}|${color}|${row}`;
+  if (!badgeCache.has(k)) {
+    badgeCache.set(k, L.divIcon({ className: "hz-badge", iconSize: null, html: `<span style="--c:${color};--row:${row}">${label}</span>` }));
+  }
+  return badgeCache.get(k);
+}
+
 export default function EuropeMap({
   fill,
   outline = [],
@@ -180,6 +189,7 @@ export default function EuropeMap({
   drawing = false,
   onDraw,
   box,
+  badges = [],
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -252,6 +262,11 @@ export default function EuropeMap({
             <CircleMarker key={`c-${f.id}`} center={[f.lat, f.lon]} radius={3} pathOptions={{ color: "#d9480f", weight: 0, fillColor: "#d9480f", fillOpacity: 1, interactive: false }} />
           ))}
           {incident && <CircleMarker center={incident} radius={7} pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#d9480f", fillOpacity: 1, interactive: false }} />}
+        </Pane>
+        <Pane name="badges" style={{ zIndex: 690, pointerEvents: "none" }}>
+          {badges.map(bd => (
+            <Marker key={bd.key} position={[bd.lat, bd.lon]} icon={badgeIcon(bd)} interactive={false} keyboard={false} />
+          ))}
         </Pane>
         <Pane name="callout" style={{ zIndex: 700, pointerEvents: "none" }}>
           {callout && icon && <Marker position={[callout.lat, callout.lon]} icon={icon} interactive={false} keyboard={false} />}

@@ -34,6 +34,7 @@ export const api = {
   historyCsvUrl: (iso2, date) => `${API_URL}/history/${iso2}.csv?date=${date}`,
   area: q => request(`/area?${areaQuery(q)}`),
   areaCsvUrl: (kind, q) => `${API_URL}/area/${kind}.csv?${areaQuery(q)}`,
+  simulate: body => request("/simulate", { method: "POST", body: JSON.stringify(body) }),
   plan: body => request("/plan", { method: "POST", body: JSON.stringify(body) }),
   model: () => request("/model"),
   health: () => request("/health"),
