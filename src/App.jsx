@@ -326,7 +326,7 @@ export default function App() {
         label={`${areaTitle}, fire cell-days`}
         onMode={m => setParams({ tl: m === "year" ? undefined : m })}
         onYear={y => setParams({ ty: String(y) })}
-        onRange={(a, b) => setParams({ from: a, to: b, date: b > date ? b : params.date, right: right === "help" ? "help" : undefined, tab: params.tab || "range" })}
+        onRange={(a, b) => setParams({ from: a, to: b, right: right === "help" ? "help" : undefined, tab: "range" })}
         onDay={setDay}
       />
 
