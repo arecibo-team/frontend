@@ -4,12 +4,16 @@ services:
   frontend:
     build: .
     image: arecibo/frontend
+    container_name: arecibo-frontend
     ports:
       - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-8088}:80"
     depends_on:
       - amber-api
       - firms-server
       - context-api
+    networks:
+      - default
+      - edge
     restart: unless-stopped
 
   amber-api:
@@ -41,3 +45,8 @@ services:
 volumes:
   amber-data:
   firms-data:
+
+networks:
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-lazar-network}
