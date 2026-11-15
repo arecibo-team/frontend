@@ -20,6 +20,11 @@ One screen built around the EU map.
 - **Simulate** sidebar: start from the replay day and add hazards (fire, flood, quake, drought, storm, volcano) to any
   countries, or pick a scenario like a Mediterranean heatwave. The map switches between power before and after, and
   the panel shows who falls below 50 and how many firefighters are tied up.
+- **Data** sidebar: detection-level MODIS and VIIRS data from the FIRMS server. Coverage of the store, the selected
+  area and range split by cross-sensor match (seen by both, MODIS only, VIIRS only) and by satellite, detections per
+  day, CSV exports of the harmonized detections (both sensors, MODIS only, VIIRS only), a drop zone to import any FIRMS
+  CSV, and the pipeline steps. **Detections** on the map toolbar shows the heat tiles (MODIS, VIIRS, confirmed) and the
+  independent incident polygons for the selected dates.
 - **Who can help** sidebar: pick a scenario and rules, and the plan draws donor routes on the map. Simulations and plans
   lock the screen until the result is in.
 
@@ -28,19 +33,25 @@ the URL, so a link opens the same area, dates and panels.
 
 ## Running it
 
-The app reads everything from the Amber Index API (`amber-index/api` in the data-science repo). Start that first, on
-port 8000 by default.
+The app reads two APIs from the data-science repo: the Amber API (`amber-index`, harmonized record, index,
+simulations) and the FIRMS server (`server`, detection-level data, tiles, imports, exports).
+
+With Docker, run the whole stack from the `arecibo` repository (`docker compose up --build`). The image here builds
+the app and serves it with nginx, which proxies `/amber/*` and `/api/*` to the two APIs.
+
+For development, start the Amber API on port 8000 and the FIRMS server on port 8002, then:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Point it at another API with `VITE_API_URL`:
+Vite proxies `/api` to the FIRMS server (`FIRMS_PROXY` changes the target). Build-time settings:
 
-```bash
-VITE_API_URL=https://api.example.org npm run build
-```
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `VITE_API_URL` | `http://127.0.0.1:8000` (`/amber` in the Docker image) | Amber API base |
+| `VITE_FIRMS_URL` | empty, same origin | FIRMS server base |
 
 ## Data
 
