@@ -9,6 +9,7 @@ import AreaPanel from "./panels/AreaPanel.jsx";
 import CoordsForm from "./panels/CoordsForm.jsx";
 import FiresPanel from "./panels/FiresPanel.jsx";
 import SimPanel from "./panels/SimPanel.jsx";
+import DataPanel from "./panels/DataPanel.jsx";
 import Busy, { useMinPending } from "./components/Busy.jsx";
 import { ALERT_COLOR, HAZARD_NAME, STORIES, decodeShocks, encodeShocks, toRequest } from "./lib/sim.js";
 import HelpPanel from "./panels/HelpPanel.jsx";
@@ -17,7 +18,7 @@ import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
 import { MONTHS, dec, longDate } from "./lib/format.js";
 import { AMBER_COLORS, AMBER_STEPS, COUNTRY_NAMES, POWER_COLORS, POWER_STEPS, classColor, fireRadius } from "./lib/geo.js";
-import { CENTROIDS, SCENARIOS, routesFor } from "./lib/plan.js";
+import { BOUNDS, CENTROIDS, SCENARIOS, routesFor } from "./lib/plan.js";
 import { useFetch } from "./lib/useFetch.js";
 
 function readHash() {
@@ -109,7 +110,7 @@ export default function App() {
   const showFires = params.fires !== "0";
   const filter = ["above", "watch"].includes(params.filter) ? params.filter : "all";
   const left = params.left !== "0";
-  const right = ["help", "sim"].includes(params.right) ? params.right : params.right === "0" ? null : "area";
+  const right = ["help", "sim", "data"].includes(params.right) ? params.right : params.right === "0" ? null : "area";
   const mode = params.mode === "raw" ? "raw" : "harmonized";
   const [drawing, setDrawing] = useState(false);
   const [dialog, setDialog] = useState(null);
@@ -184,6 +185,52 @@ export default function App() {
   const simView = params.view === "before" ? "before" : "after";
   const busySim = useMinPending(Boolean(simKey) && sim.loading, 1100);
   const busyPlan = useMinPending(Boolean(helpKey) && plan.loading, 1100);
+
+  const detectionsOn = params.det === "1";
+  const [layers, setLayers] = useState({ modis: true, viirs: true, common: true, incidents: false });
+  const [dataVersion, setDataVersion] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState(null);
+  const firmsQ = { from, to, bounds: box || BOUNDS[iso2] };
+  const dataOpen = right === "data";
+  const summary = useFetch(() => (dataOpen ? api.firms.summary(firmsQ) : Promise.resolve(null)), [dataOpen, from, to, query.box, iso2, dataVersion]);
+  const sources = useFetch(() => (dataOpen ? api.firms.sources() : Promise.resolve(null)), [dataOpen, dataVersion]);
+  const [pipeTick, setPipeTick] = useState(0);
+  const pipeline = useFetch(() => (dataOpen || importResult ? api.firms.pipeline() : Promise.resolve(null)), [dataOpen, pipeTick, dataVersion]);
+  const pipeRunning = Boolean(pipeline.data?.running);
+  useEffect(() => {
+    if (!pipeRunning) return undefined;
+    const t = setTimeout(() => setPipeTick(n => n + 1), 3000);
+    return () => clearTimeout(t);
+  }, [pipeRunning, pipeTick]);
+  const [wasRunning, setWasRunning] = useState(false);
+  useEffect(() => {
+    if (pipeRunning) setWasRunning(true);
+    else if (wasRunning) {
+      setWasRunning(false);
+      setDataVersion(v => v + 1);
+    }
+  }, [pipeRunning]);
+  const mask = (layers.modis ? 1 : 0) | (layers.viirs ? 2 : 0) | (layers.common ? 4 : 0);
+  const tileUrl = detectionsOn && mask ? api.firms.tileUrl(from, to, mask, dataVersion) : null;
+  const incidentsOn = detectionsOn && layers.incidents;
+  const incidentData = useFetch(() => (incidentsOn ? api.firms.incidents({ from, to }) : Promise.resolve(null)), [incidentsOn, from, to, dataVersion]);
+  const runImport = async file => {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const out = await api.firms.upload(file);
+      setImportResult(out);
+      setParams({ det: "1" });
+      setPipeTick(n => n + 1);
+    } catch (e) {
+      setImportError(e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+  const busyImport = useMinPending(importing, 1100);
 
   const rd = replay.data;
   const byIso = useMemo(() => Object.fromEntries((rd?.countries || []).map(c => [c.iso2, c])), [rd]);
@@ -279,6 +326,10 @@ export default function App() {
               <Icon name="help" />
               Who can help
             </button>
+            <button className={right === "data" ? "on" : ""} type="button" aria-pressed={right === "data"} onClick={() => setParams({ right: right === "data" ? undefined : "data" })}>
+              <Icon name="data" />
+              Data
+            </button>
           </nav>
           <button className="text-btn" type="button" onClick={() => setDialog("method")}>
             <Icon name="book" />
@@ -317,6 +368,10 @@ export default function App() {
                 Fires
               </label>
             )}
+            <button className={`tool${detectionsOn ? " on-soft" : ""}`} type="button" aria-pressed={detectionsOn} onClick={() => setParams({ det: detectionsOn ? undefined : "1" })}>
+              <Icon name="layers" />
+              Detections
+            </button>
             <span className="tool-sep" />
             <button className={`tool${drawing ? " on" : ""}`} type="button" aria-pressed={drawing} onClick={() => setDrawing(d => !d)}>
               <Icon name="draw" />
@@ -333,6 +388,8 @@ export default function App() {
             selected={s ? null : p ? p.recipient.iso2 : iso2}
             outline={s ? [...new Set(simShocks.map(x => x.iso2))] : p ? p.donors.map(d => d.iso2) : []}
             badges={badges}
+            tiles={tileUrl}
+            incidents={incidentsOn && incidentData.data ? { key: `${from}-${to}-${dataVersion}-${incidentData.data.features.length}`, data: incidentData.data } : null}
             hatch={p ? p.left_out.map(l => l.iso2) : []}
             routes={p ? routesFor(p) : []}
             incident={p ? p.incident : null}
@@ -387,6 +444,29 @@ export default function App() {
             )}
           </Sidebar>
         )}
+        {right === "data" && (
+          <Sidebar side="right" title="Data" sub="NASA FIRMS, MODIS and VIIRS" onClose={() => setParams({ right: undefined })} width={400}>
+            {() => (
+              <DataPanel
+                summary={summary}
+                sources={sources}
+                pipeline={pipeline}
+                query={firmsQ}
+                areaLabel={areaTitle}
+                rangeLabel={`${longDate(from)} to ${longDate(to)}`}
+                onImport={runImport}
+                importing={importing}
+                importResult={importResult}
+                importError={importError}
+                layers={layers}
+                setLayers={l => {
+                  setLayers(l);
+                  if (!detectionsOn) setParams({ det: "1" });
+                }}
+              />
+            )}
+          </Sidebar>
+        )}
         {right === "help" && (
           <Sidebar side="right" title="Who can help" onClose={() => setParams({ right: undefined })} width={360}>
             {wide => <HelpPanel form={form} setForm={setForm} onRun={runPlan} plan={plan.data} error={plan.error} loading={plan.loading} wide={wide} />}
@@ -410,6 +490,7 @@ export default function App() {
       />
 
       <Busy show={busySim} title="Running the simulation" steps={["Adding the hazards to each country", "Recomputing the Amber index", "Committing crews and power", "Ranking the EU"]} />
+      <Busy show={busyImport} title="Importing FIRMS data" steps={["Reading the CSV", "Sorting rows by satellite and product", "Starting the harmonization pipeline"]} />
       <Busy show={busyPlan && !busySim} title="Planning assistance" steps={["Checking who has power to spare", "Solving the assignment", "Timing the routes"]} />
 
       {dialog === "method" && (

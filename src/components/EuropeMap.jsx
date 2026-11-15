@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CircleMarker, MapContainer, Marker, Pane, Polyline, Rectangle, ScaleControl, ZoomControl, useMap } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, Rectangle, ScaleControl, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import { BASEMAPS, EUROPE_BOUNDS, FLY_DURATION, HOME_BOUNDS, MAX_ZOOM, basemapHasOwnLabels } from "../config.js";
 import { fireRadius } from "../lib/geo.js";
@@ -190,6 +190,8 @@ export default function EuropeMap({
   onDraw,
   box,
   badges = [],
+  tiles,
+  incidents,
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -241,6 +243,27 @@ export default function EuropeMap({
           flyOnSelect={flyOnSelect}
         />
         <CountryLabels visible={prefs.namesOn && basemapHasOwnLabels(prefs.basemap)} />
+        {tiles && (
+          <Pane name="detections" style={{ zIndex: 450, pointerEvents: "none" }}>
+            <TileLayer key={tiles} url={tiles} opacity={0.95} maxZoom={MAX_ZOOM} maxNativeZoom={12} />
+          </Pane>
+        )}
+        {incidents && (
+          <Pane name="incidents" style={{ zIndex: 460 }}>
+            <GeoJSON
+              key={incidents.key}
+              data={incidents.data}
+              style={() => ({ color: "#7c2d12", weight: 1.5, dashArray: "4 3", fillColor: "#7c2d12", fillOpacity: 0.08 })}
+              onEachFeature={(f, layer) => {
+                const p = f.properties;
+                layer.bindTooltip(
+                  `<b>${p.name || p.source}</b><br>${p.source}, ${p.start_date} to ${p.end_date}${p.area_ha ? `<br>${Math.round(p.area_ha).toLocaleString("en-GB")} ha` : ""}${p.detections ? `, ${p.detections.toLocaleString("en-GB")} detections` : ""}`,
+                  { sticky: true }
+                );
+              }}
+            />
+          </Pane>
+        )}
         <Pane name="marks" style={{ zIndex: 620, pointerEvents: "none" }}>
           {routes.map((r, i) =>
             r.from && r.to ? (

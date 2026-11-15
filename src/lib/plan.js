@@ -1,4 +1,4 @@
-import { geoArea, geoCentroid } from "d3-geo";
+import { geoArea, geoBounds, geoCentroid } from "d3-geo";
 import { COUNTRIES } from "./geo.js";
 import { listJoin, word } from "./format.js";
 
@@ -24,6 +24,7 @@ function polygons(feature) {
 }
 
 export const CENTROIDS = {};
+export const BOUNDS = {};
 const LARGEST = {};
 COUNTRIES.filter(f => f.iso2).forEach(f => {
   polygons(f).forEach(p => {
@@ -32,6 +33,8 @@ COUNTRIES.filter(f => f.iso2).forEach(f => {
       LARGEST[f.iso2] = a;
       const [lon, lat] = geoCentroid(p);
       CENTROIDS[f.iso2] = [lat, lon];
+      const [[w, s], [e, n]] = geoBounds(p);
+      BOUNDS[f.iso2] = [w, s, e, n].map(v => Math.round(v * 100) / 100);
     }
   });
 });
