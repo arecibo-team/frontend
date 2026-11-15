@@ -87,7 +87,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The front listens on `127.0.0.1:8088` by default, and the Pangolin tunnel publishes it.
+The front listens on `127.0.0.1:8088` by default and joins the `lazar-network` Docker network, where the Pangolin tunnel
+(`newt`, site "Proxy") reaches it. In Pangolin, `arecibo.bylazar.com` is a public HTTP resource with SSO off, and its
+target is `arecibo-frontend:80` on the "Proxy" site, with method `http`.
 
 Deployment is automatic. `.github/workflows/ci.yml` (in both repos) builds the images on every pull request on GitHub,
 and on a push to `main` the self-hosted runner on lazarvps runs `deploy/deploy.sh`. The script updates both checkouts
