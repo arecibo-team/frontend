@@ -56,6 +56,7 @@ ul, ol { list-style: none; }
 .panel-nav button.on { color: var(--ink); font-weight: 500; border-bottom-color: var(--ember); }
 .panel-nav .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .text-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; background: none; color: var(--ink-2); cursor: pointer; border-radius: 6px; white-space: nowrap; }
+a.text-btn { text-decoration: none; }
 .text-btn:hover { background: var(--canvas); color: var(--ink); }
 .text-btn:disabled { opacity: .4; cursor: default; }
 .search { position: relative; width: 168px; margin-left: 4px; }

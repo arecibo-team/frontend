@@ -541,6 +541,10 @@ export default function App() {
               Data
             </button>
           </nav>
+          <a className="text-btn" href="/science/" title="Detection-level MODIS and VIIRS data, models and forecasts">
+            <Icon name="flask" />
+            Science
+          </a>
           <button className="text-btn" type="button" onClick={() => setDialog("method")}>
             <Icon name="book" />
             Method
