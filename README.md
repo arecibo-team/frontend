@@ -87,6 +87,10 @@ docker compose up -d --build
 docker compose ps
 ```
 
+The data-science web app is served at `/science/`. The `firms-server` image builds it, and nginx sends `/science/` to
+the server's root, so its relative `api/...` calls arrive as `/science/api/...` and reach the same API. The header has
+a Science button that links to it. In development, Vite proxies `/science` to the FIRMS server too.
+
 The front listens on `127.0.0.1:8088` by default and joins the `lazar-network` Docker network, where the Pangolin tunnel
 (`newt`, site "Proxy") reaches it. In Pangolin, `arecibo.bylazar.com` is a public HTTP resource with SSO off, and its
 target is `arecibo-frontend:80` on the "Proxy" site, with method `http`.
