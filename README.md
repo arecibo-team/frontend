@@ -66,6 +66,33 @@ Vite proxies `/api` to the FIRMS server (`FIRMS_PROXY` changes the target). Buil
 `scripts/build-regions.mjs` rebuilds the region shapes (`src/data/eu-regions.json`) and the anchors the Amber API uses
 (`node scripts/build-regions.mjs ../data-science/amber-index/amber/regions_geo.json`).
 
+## Deployment
+
+The stack runs as four containers from `docker-compose.yml`: `frontend` (nginx, the only one with a published port),
+`amber-api`, `firms-server` and `context-api`. The two backends build from the data-science repo, which sits next to this
+one, so both are checked out side by side:
+
+```
+~/arecibo/
+  frontend/          this repo
+  data-science/      the APIs
+  actions-runner/    the GitHub Actions self-hosted runner
+```
+
+On the server, copy `.env.example` to `.env` and adjust it, then:
+
+```bash
+cd ~/arecibo/frontend
+docker compose up -d --build
+docker compose ps
+```
+
+The front listens on `127.0.0.1:8088` by default, and the Pangolin tunnel publishes it.
+
+Deployment is automatic. `.github/workflows/ci.yml` (in both repos) builds the images on every pull request on GitHub,
+and on a push to `main` the self-hosted runner on lazarvps runs `deploy/deploy.sh`. The script updates both checkouts
+to `origin/main`, rebuilds the stack and waits for the front to answer.
+
 ## Data
 
 NASA FIRMS MODIS C6.1 and VIIRS S-NPP 375 m country archives, GDACS, Eurostat, OpenStreetMap, GWIS through Our World in
