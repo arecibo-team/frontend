@@ -140,8 +140,8 @@ function Training({ runs, refresh, horizon, onModelChanged }) {
       } else {
         setNote(ev.type === "done" ? "Training finished" : ev.type === "stopped" ? "Stopped, checkpoint saved" : `Failed: ${ev.message}`);
         source.close();
-        refresh();
-        if (ev.type === "done") onModelChanged();
+        [0, 1500, 4000].forEach(ms => setTimeout(refresh, ms));
+        if (ev.type === "done") setTimeout(onModelChanged, 1500);
       }
     };
     source.onerror = () => {
@@ -160,6 +160,11 @@ function Training({ runs, refresh, horizon, onModelChanged }) {
     }
   }, [running, newest]);
   useEffect(() => () => es.current?.close(), []);
+  useEffect(() => {
+    if (!running) return undefined;
+    const t = setInterval(refresh, 5000);
+    return () => clearInterval(t);
+  }, [running, refresh]);
 
   const act = fn => {
     setError(null);
