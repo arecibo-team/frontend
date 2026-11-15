@@ -4,6 +4,9 @@
 set -euo pipefail
 
 ROOT="${ARECIBO_ROOT:-$HOME/arecibo}"
+exec 9>"$ROOT/deploy.lock"
+flock 9
+
 PORT="$(grep -s '^FRONTEND_PORT=' "$ROOT/frontend/.env" | cut -d= -f2 || true)"
 PORT="${PORT:-8088}"
 
