@@ -36,8 +36,6 @@ services:
   context-api:
     build: ../data-science/apis/context
     image: arecibo/context-api
-    volumes:
-      - ${CONTEXT_DATA_DIR:-/var/lib/arecibo/context-data}:/app/data:ro
     restart: unless-stopped
 
 volumes:

@@ -85,8 +85,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The front listens on `127.0.0.1:8088` by default, and the Pangolin tunnel publishes it. `context-api` reads its JSON
-files from `CONTEXT_DATA_DIR`, which has to be filled in before that container can start.
+The front listens on `127.0.0.1:8088` by default, and the Pangolin tunnel publishes it.
 
 Deployment is automatic. `.github/workflows/ci.yml` (in both repos) builds the images on every pull request on GitHub,
 and on a push to `main` the self-hosted runner on lazarvps runs `deploy/deploy.sh`. The script updates both checkouts
