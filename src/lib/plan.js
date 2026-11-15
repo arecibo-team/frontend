@@ -57,5 +57,5 @@ export function leftOutSentence(items) {
 }
 
 export function routesFor(plan) {
-  return plan.donors.map((d, i, all) => ({ from: CENTROIDS[d.iso2], to: plan.incident, width: 1.2 + 2 * (1 - i / Math.max(all.length, 1)) }));
+  return plan.donors.map((d, i, all) => ({ from: d.departure || CENTROIDS[d.iso2], to: plan.incident, width: 1.2 + 2 * (1 - i / Math.max(all.length, 1)) }));
 }

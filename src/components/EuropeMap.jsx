@@ -120,6 +120,28 @@ function DrawBox({ active, onDraw }) {
   return null;
 }
 
+function CellLayer({ cells }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map.getPane("cells")) {
+      const pane = map.createPane("cells");
+      pane.style.zIndex = 440;
+      pane.style.pointerEvents = "none";
+    }
+    const renderer = L.canvas({ pane: "cells", padding: 0.2 });
+    const half = cells.res / 2;
+    const group = L.layerGroup(
+      cells.data.map(([lat, lon, v]) =>
+        L.rectangle([[lat - half, lon - half], [lat + half, lon + half]], {
+          renderer, stroke: false, fillColor: cells.color(v), fillOpacity: cells.opacity ?? 0.78, interactive: false
+        })
+      )
+    ).addTo(map);
+    return () => group.remove();
+  }, [map, cells.key]);
+  return null;
+}
+
 function FitTo({ points }) {
   const map = useMap();
   const key = JSON.stringify(points);
@@ -192,6 +214,8 @@ export default function EuropeMap({
   badges = [],
   tiles,
   incidents,
+  regionShapes,
+  cells,
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -243,6 +267,27 @@ export default function EuropeMap({
           flyOnSelect={flyOnSelect}
         />
         <CountryLabels visible={prefs.namesOn && basemapHasOwnLabels(prefs.basemap)} />
+        {regionShapes && (
+          <Pane name="regions" style={{ zIndex: 430 }}>
+            <GeoJSON
+              key={regionShapes.key}
+              data={regionShapes.data}
+              style={regionShapes.style}
+              onEachFeature={(f, layer) => {
+                layer.bindTooltip(() => regionShapes.tooltip(f), { sticky: true, className: "region-tip" });
+                layer.on({
+                  mouseover: () => layer.setStyle({ weight: 2, color: "#18181b" }),
+                  mouseout: () => layer.setStyle(regionShapes.style(f)),
+                  click: e => {
+                    L.DomEvent.stopPropagation(e);
+                    regionShapes.onClick?.(f.properties);
+                  }
+                });
+              }}
+            />
+          </Pane>
+        )}
+        {cells && <CellLayer cells={cells} />}
         {tiles && (
           <Pane name="detections" style={{ zIndex: 450, pointerEvents: "none" }}>
             <TileLayer key={tiles} url={tiles} opacity={0.95} maxZoom={MAX_ZOOM} maxNativeZoom={12} />

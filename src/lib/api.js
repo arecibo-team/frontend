@@ -1,5 +1,6 @@
 export const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 export const FIRMS_URL = (import.meta.env.VITE_FIRMS_URL ?? "").replace(/\/$/, "");
+export const CONTEXT_URL = (import.meta.env.VITE_CONTEXT_URL ?? "/context").replace(/\/$/, "");
 
 async function request(path, options = {}, base = API_URL) {
   const res = await fetch(`${base}${path}`, {
@@ -46,7 +47,21 @@ export const api = {
   historyCsvUrl: (iso2, date) => `${API_URL}/history/${iso2}.csv?date=${date}`,
   area: q => request(`/area?${areaQuery(q)}`),
   areaCsvUrl: (kind, q) => `${API_URL}/area/${kind}.csv?${areaQuery(q)}`,
+  regions: date => request(`/regions?date=${date}`),
+  scoreDetail: iso2 => request(`/scores/${iso2}`),
+  scoreHistory: iso2 => request(`/scores/${iso2}/history`),
+  customWeights: body => request("/score/custom-weights", { method: "POST", body: JSON.stringify(body) }),
+  live: () => request("/live"),
+  context: {
+    months: () => request("/months", {}, CONTEXT_URL),
+    countries: month => request(`/countries?month=${month}`, {}, CONTEXT_URL),
+    country: (code, month) => request(`/countries/${code}${month ? `?month=${month}` : ""}`, {}, CONTEXT_URL),
+    point: (lat, lon, month) => request(`/point?lat=${lat}&lon=${lon}${month ? `&month=${month}` : ""}`, {}, CONTEXT_URL),
+    grid: (layer, month) => request(`/grid/${layer}${month ? `?month=${month}` : ""}`, {}, CONTEXT_URL)
+  },
   firms: {
+    weather: (lat, lon, time) => request(`/api/weather?lat=${lat}&lon=${lon}&time=${encodeURIComponent(time)}`, {}, FIRMS_URL),
+    modelRuns: () => request("/api/model/runs", {}, FIRMS_URL),
     summary: q => request(`/api/summary?${firmsQuery(q)}`, {}, FIRMS_URL),
     sources: () => request("/api/sources", {}, FIRMS_URL),
     pipeline: () => request("/api/pipeline", {}, FIRMS_URL),
