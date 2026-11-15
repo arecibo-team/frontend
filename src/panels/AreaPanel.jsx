@@ -5,7 +5,7 @@ import { MONTHS, MONTHS_SHORT, dec, longDate, monthYear, num, ordinal, parseDate
 import { BAND_COLORS } from "../lib/geo.js";
 import { DATA_FROM, DATA_TO, clampDate, iso, lastDay, presets } from "../lib/dates.js";
 import { historySentence, normalSentence } from "../lib/sentences.js";
-import { ContextCard, ReasonsCard, RegionsCompass, TrendCard } from "./Insights.jsx";
+import { FuelDryness, Pending, ReasonsList, RegionsTable, Section, Trend } from "./Insights.jsx";
 
 const RAMP = ["#fde9d9", "#fbcfa9", "#f6ad75", "#ec8346", "#d9581f", "#a63a10"];
 
@@ -173,11 +173,11 @@ function YearBars({ rows, median, current }) {
 
 function RangeControls({ from, to, asof, setParams }) {
   return (
-    <>
+    <div className="range-controls">
       <div className="range-inputs">
         <input type="date" className="date" min={DATA_FROM} max={to} value={from} aria-label="From"
           onChange={e => e.target.value && setParams({ from: clampDate(e.target.value) })} />
-        <span className="small">to</span>
+        <span className="quiet">to</span>
         <input type="date" className="date" min={from} max={DATA_TO} value={to} aria-label="To"
           onChange={e => {
             if (!e.target.value) return;
@@ -185,14 +185,24 @@ function RangeControls({ from, to, asof, setParams }) {
             setParams(t > asof ? { to: t, date: t } : { to: t });
           }} />
       </div>
-      <div className="chips">
+      <div className="presets" role="group" aria-label="Preset ranges">
         {presets(asof).map(([label, a, b]) => (
-          <button key={label} type="button" className={`chip${a === from && b === to ? " on" : ""}`} onClick={() => setParams({ from: a, to: b })}>
+          <button key={label} type="button" className={a === from && b === to ? "on" : ""} onClick={() => setParams({ from: a, to: b })}>
             {label}
           </button>
         ))}
       </div>
-    </>
+    </div>
+  );
+}
+
+function Metric({ value, label, note, tone }) {
+  return (
+    <div className="metric">
+      <span className="metric-v num">{value}</span>
+      <span className="metric-l">{label}</span>
+      {note && <span className={`metric-d${tone ? ` ${tone}` : ""}`}>{note}</span>}
+    </div>
   );
 }
 
@@ -202,75 +212,53 @@ function Range({ data, query, from, to, asof, setParams }) {
   const by = s.detections_by_sensor;
   const year = parseDate(data.end).year;
   const downloads = [
-    ["hotspots", "Hotspots", `${num(s.detections)} rows`],
-    ["daily", "Daily counts", `${num(s.days)} rows`],
-    ["calendar", "Monthly calendar", "since 2001"]
+    ["hotspots", "Hotspots", num(s.detections)],
+    ["daily", "Daily counts", num(s.days)],
+    ["calendar", "Monthly calendar", "2001–"]
   ];
   return (
     <div className="range">
       <RangeControls from={from} to={to} asof={asof} setParams={setParams} />
-      <div className="kpis">
-        <div>
-          <div className="label">Fire cell-days</div>
-          <div className="big">{num(s.harmonized_cell_days)}</div>
-        </div>
-        <div>
-          <div className="label">Against 2001–2020</div>
-          <div className="big">{rn && rn.ratio != null ? `${Number(rn.ratio).toFixed(1)}×` : "–"}</div>
-          {rn && <div className="small">{rn.rank === 1 ? "Highest" : ordinal(rn.rank)} of {rn.years} years</div>}
-        </div>
-        <div>
-          <div className="label">Hotspots</div>
-          <div className="big">{num(s.detections)}</div>
-          <div className="small">
-            VIIRS {num(by["VIIRS S-NPP"])} · MODIS {num(by["MODIS Terra"] + by["MODIS Aqua"])}
-          </div>
-        </div>
-        <div>
-          <div className="label">Fires</div>
-          <div className="big">{num(s.fires)}</div>
-          {s.max_frp > 0 && <div className="small">peak {num(s.max_frp)} MW</div>}
-        </div>
+      <div className="metrics">
+        <Metric value={num(s.harmonized_cell_days)} label="Fire cell-days" />
+        <Metric value={rn && rn.ratio != null ? `${Number(rn.ratio).toFixed(1)}×` : "–"} label="vs 2001–2020"
+          note={rn ? `${rn.rank === 1 ? "Highest" : ordinal(rn.rank)} of ${rn.years}` : null} tone={rn && rn.rank <= 3 ? "up" : null} />
+        <Metric value={num(s.detections)} label="Hotspots" note={`VIIRS ${num(by["VIIRS S-NPP"])}, MODIS ${num(by["MODIS Terra"] + by["MODIS Aqua"])}`} />
+        <Metric value={num(s.fires)} label="Fires" note={s.max_frp > 0 ? `peak ${num(s.max_frp)} MW` : null} />
       </div>
-      <div className="range-grid">
-        <div>
-          <h3 className="h3">{data.series.unit === "day" ? "Per day" : "Per month"}</h3>
-          <Bars values={data.series.values} unit={data.series.unit} highlight={s.busiest_day} />
-        </div>
-        {rn && (
-          <div>
-            <h3 className="h3">Same dates, every year</h3>
-            <YearBars rows={rn.by_year} median={rn.median} current={year} />
-          </div>
-        )}
-      </div>
-      {data.fires.length > 0 && (
-        <div className="block">
-          <h3 className="h3">Fires</h3>
-          <ol className="rank-list">
-            {data.fires.slice(0, 5).map((f, i) => (
-              <li key={`${f.name}-${f.start}-${i}`}>
-                <span>{i + 1}</span>
-                <span>
-                  {f.name}, {shortDay(f.start)} {f.start.slice(0, 4)}
-                </span>
-                <span>{num(f.area_ha)} ha</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+      <Section title={data.series.unit === "day" ? "Per day" : "Per month"}>
+        <Bars values={data.series.values} unit={data.series.unit} highlight={s.busiest_day} />
+      </Section>
+      {rn && (
+        <Section title="Same dates, every year">
+          <YearBars rows={rn.by_year} median={rn.median} current={year} />
+        </Section>
       )}
-      <div className="downloads">
-        <h3 className="h3">Download CSV</h3>
-        <div className="download-row">
+      {data.fires.length > 0 && (
+        <Section title="Fires">
+          <table className="tbl">
+            <tbody>
+              {data.fires.slice(0, 5).map((f, i) => (
+                <tr key={`${f.name}-${f.start}-${i}`}>
+                  <th scope="row">{f.name}</th>
+                  <td className="quiet">{shortDay(f.start)} {f.start.slice(0, 4)}</td>
+                  <td className="r num">{num(f.area_ha)} ha</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
+      <Section title="Download CSV">
+        <ul className="links">
           {downloads.map(([kind, label, hint]) => (
-            <a key={kind} className="download" href={api.areaCsvUrl(kind, query)} download>
-              <b>{label}</b>
-              <span>{hint}</span>
-            </a>
+            <li key={kind}>
+              <a href={api.areaCsvUrl(kind, query)} download>{label}</a>
+              <span className="num quiet">{hint}</span>
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
+      </Section>
     </div>
   );
 }
@@ -283,43 +271,18 @@ function Now({ data, country, onHelp, regions, focusRegion, box, onWeights }) {
   return (
     <div className="now">
       {country && (
-        <>
-          <div className="band">
-            <i style={{ background: BAND_COLORS[country.band] }} />
-            {country.band} band, Amber index {Math.round(country.amber)}
-          </div>
-          <div className="stats">
-            <div className="stat">
-              <div className="label">Power</div>
-              <div className="big">{Math.round(country.power)}</div>
-              <div className={`delta${diff < 0 ? " down" : ""}`}>
-                {diff < 0 ? `${-diff} lower than on ${refLabel}` : diff > 0 ? `${diff} higher than on ${refLabel}` : `Same as on ${refLabel}`}
-              </div>
-            </div>
-            <div className="stat">
-              <div className="label">Rank in the EU</div>
-              <div className="big">
-                {country.power_rank} <small>of 27</small>
-              </div>
-              <div className="delta">{ordinal(country.power_rank_ref)} on {refLabel}</div>
-            </div>
-          </div>
-        </>
+        <div className="metrics metrics-3">
+          <Metric value={Math.round(country.power)} label="Power" note={diff ? `${diff > 0 ? "+" : "−"}${Math.abs(diff)} since ${refLabel}` : `same as ${refLabel}`} tone={diff < 0 ? "down" : null} />
+          <Metric value={<>{country.power_rank}<small>/27</small></>} label="Rank" note={`${ordinal(country.power_rank_ref)} on ${refLabel}`} />
+          <Metric value={Math.round(country.amber)} label="Amber index" note={<><i className="band-dot" style={{ background: BAND_COLORS[country.band] }} />{country.band}</>} />
+        </div>
       )}
-      {country && <RegionsCompass iso2={country.iso2} rows={regions?.data?.regions} power={country.power} focusRegion={focusRegion} loading={regions?.loading} />}
-      <div className="block">
-        <h3 className="h3">Is this normal</h3>
-        <p className="normal-text">{country ? normalSentence(n, data.name) : `${historySentence(n)}.`}</p>
-        <p className="small" style={{ marginTop: 6 }}>
-          Usual {MONTHS[n.month - 1]}: {num(n.usual_low)} to {num(n.usual_high)} cell-days
-        </p>
-      </div>
-      <ContextCard iso2={country ? country.iso2 : null} box={country ? null : box} date={data.date} />
-      {country && <ReasonsCard iso2={country.iso2} />}
-      {country && <TrendCard iso2={country.iso2} />}
+      <Section title={`${MONTHS[n.month - 1]} ${n.year}`} aside={`usual ${num(n.usual_low)}–${num(n.usual_high)}`}>
+        <p className="lede">{country ? normalSentence(n, data.name) : `${historySentence(n)}.`}</p>
+      </Section>
+      {country && <RegionsTable iso2={country.iso2} rows={regions?.data?.regions} focusRegion={focusRegion} loading={regions?.loading} />}
       {country && (
-        <div className="block">
-          <h3 className="h3">What drives the score</h3>
+        <Section title="Score drivers">
           <div className="pillars">
             {[["Fire danger", country.danger, true], ["Other hazards", country.hazards], ["Workforce", country.workforce], ["Capability", country.capability]].map(([label, v, hot]) => (
               <Fragment key={label}>
@@ -327,60 +290,43 @@ function Now({ data, country, onHelp, regions, focusRegion, box, onWeights }) {
                 <span className="track">
                   <b className={hot ? "hot" : ""} style={{ width: `${Math.max(0, Math.min(1, v)) * 100}%` }} />
                 </span>
-                <span className="val">{dec(v)}</span>
+                <span className="val num">{dec(v)}</span>
               </Fragment>
             ))}
           </div>
-        </div>
+        </Section>
       )}
+      {country && <ReasonsList iso2={country.iso2} />}
+      {country && <Trend iso2={country.iso2} />}
+      <FuelDryness iso2={country ? country.iso2 : null} box={country ? null : box} date={data.date} />
       {o && (
-        <div className="block">
-          <h3 className="h3">Next {o.weeks} weeks, to {partOfMonth(o.until)}</h3>
-          <div className="figures">
-            <div>
-              <div className="label">Share of a year</div>
-              <div className="big">{Math.round(o.share * 100)}%</div>
-            </div>
-            <div>
-              <div className="label">Typical week</div>
-              <div className="big">{num(o.typical_week)}</div>
-            </div>
-            <div>
-              <div className="label">Bad week</div>
-              <div className="big">{num(o.bad_week)}</div>
-            </div>
-          </div>
-        </div>
+        <Section title={`Next ${o.weeks} weeks`} aside={`to ${partOfMonth(o.until)}`}>
+          <dl className="defs">
+            <div><dt>Share of a year's fire</dt><dd className="num">{Math.round(o.share * 100)}%</dd></div>
+            <div><dt>Typical week</dt><dd className="num">{num(o.typical_week)}</dd></div>
+            <div><dt>Bad week, 1 in 10</dt><dd className="num">{num(o.bad_week)}</dd></div>
+          </dl>
+        </Section>
       )}
       {data.largest_fires.length > 0 && (
-        <div className="block">
-          <h3 className="h3">Largest fires since 2012</h3>
-          <ol className="rank-list">
-            {data.largest_fires.map((f, i) => (
-              <li key={`${f.name}-${f.start}`}>
-                <span>{i + 1}</span>
-                <span>
-                  {f.name}, {monthYear(f.start)}
-                </span>
-                <span>{num(f.area_ha)} ha</span>
-              </li>
-            ))}
-          </ol>
-          {data.analog && <p className="small" style={{ marginTop: 10 }}>Closest year so far: {data.analog.year}</p>}
-        </div>
+        <Section title="Largest since 2012" aside={data.analog ? `closest year ${data.analog.year}` : null}>
+          <table className="tbl">
+            <tbody>
+              {data.largest_fires.map(f => (
+                <tr key={`${f.name}-${f.start}`}>
+                  <th scope="row">{f.name}</th>
+                  <td className="quiet">{monthYear(f.start)}</td>
+                  <td className="r num">{num(f.area_ha)} ha</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
       )}
       {country && (
-        <div className="now-actions">
-          {onHelp && (
-            <button className="btn-dark" type="button" onClick={onHelp}>
-              Find countries that can help
-            </button>
-          )}
-          {onWeights && (
-            <button className="btn" type="button" onClick={onWeights}>
-              Adjust the index weights
-            </button>
-          )}
+        <div className="actions">
+          {onHelp && <button className="btn-dark" type="button" onClick={onHelp}>Find help</button>}
+          {onWeights && <button className="btn" type="button" onClick={onWeights}>Reweigh the index</button>}
         </div>
       )}
     </div>
@@ -391,7 +337,7 @@ export default function AreaPanel({ data, error, loading, country, wide, tab, mo
   const [localTab, setLocalTab] = useState(tab || "now");
   useEffect(() => setLocalTab(tab || "now"), [tab]);
   if (error) return <p className="notice">Could not load this area: {error.message}</p>;
-  if (!data) return <p className="loading">Loading…</p>;
+  if (!data) return <Pending rows={6} />;
   const calendar = (
     <div className="cal-wrap">
       <div className="cal-tools">

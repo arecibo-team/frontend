@@ -147,7 +147,7 @@ function FitTo({ points }) {
   const key = JSON.stringify(points);
   useEffect(() => {
     if (!points || points.length < 2) return;
-    map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 8, duration: FLY_DURATION });
+    map.flyToBounds(L.latLngBounds(points), { paddingTopLeft: [48, 96], paddingBottomRight: [48, 48], maxZoom: 8, duration: FLY_DURATION });
   }, [map, key]);
   return null;
 }
@@ -216,6 +216,8 @@ export default function EuropeMap({
   incidents,
   regionShapes,
   cells,
+  flows = [],
+  slowFade = false,
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -229,11 +231,14 @@ export default function EuropeMap({
       }
       return next;
     });
+  const shapesRef = useRef(regionShapes);
+  shapesRef.current = regionShapes;
+  const maxFlow = Math.max(...flows.map(f => f.n), 1);
   const tone = BASEMAPS.find(b => b.id === prefs.basemap)?.labelTone === "dark" ? " labels-dark" : "";
   const icon = useMemo(() => (callout ? calloutIcon(callout.title, callout.sub) : null), [callout?.title, callout?.sub]);
 
   return (
-    <div className={`map-box${tone}${drawing ? " drawing" : ""}`} role="region" aria-label={ariaLabel}>
+    <div className={`map-box${tone}${drawing ? " drawing" : ""}${slowFade ? " slow-fade" : ""}`} role="region" aria-label={ariaLabel}>
       {drawing && <div className="draw-hint">Drag on the map to draw your area</div>}
       <MapContainer
         className="map"
@@ -274,13 +279,13 @@ export default function EuropeMap({
               data={regionShapes.data}
               style={regionShapes.style}
               onEachFeature={(f, layer) => {
-                layer.bindTooltip(() => regionShapes.tooltip(f), { sticky: true, className: "region-tip" });
+                layer.bindTooltip(() => shapesRef.current?.tooltip(f) || "", { sticky: true, className: "region-tip" });
                 layer.on({
                   mouseover: () => layer.setStyle({ weight: 2, color: "#18181b" }),
-                  mouseout: () => layer.setStyle(regionShapes.style(f)),
+                  mouseout: () => shapesRef.current && layer.setStyle(shapesRef.current.style(f)),
                   click: e => {
                     L.DomEvent.stopPropagation(e);
-                    regionShapes.onClick?.(f.properties);
+                    shapesRef.current?.onClick?.(f.properties);
                   }
                 });
               }}
@@ -310,6 +315,23 @@ export default function EuropeMap({
           </Pane>
         )}
         <Pane name="marks" style={{ zIndex: 620, pointerEvents: "none" }}>
+          {flows.map(f => (
+            <Polyline
+              key={`base-${f.key}`}
+              positions={curve(f.from, f.to)}
+              pathOptions={{ className: `flow-base flow-${f.kind} o${Math.min(f.order, 7)}`, weight: 1.5 + 5 * Math.sqrt(f.n / maxFlow), interactive: false }}
+            />
+          ))}
+          {flows.map(f => (
+            <Polyline
+              key={`run-${f.key}`}
+              positions={curve(f.from, f.to)}
+              pathOptions={{ className: `flow-run flow-${f.kind} o${Math.min(f.order, 7)}`, weight: Math.max(1.5, 0.5 * (1.5 + 5 * Math.sqrt(f.n / maxFlow))), interactive: false }}
+            />
+          ))}
+          {flows.map(f => (
+            <CircleMarker key={`end-${f.key}`} center={f.from} radius={3} pathOptions={{ className: `flow-dot o${Math.min(f.order, 7)}`, weight: 0, fillOpacity: 1, interactive: false }} />
+          ))}
           {routes.map((r, i) =>
             r.from && r.to ? (
               <Polyline key={`r-${i}`} positions={curve(r.from, r.to)} pathOptions={{ color: "#18181b", weight: r.width, dashArray: "6 5", interactive: false }} />

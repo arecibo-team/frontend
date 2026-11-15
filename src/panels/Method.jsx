@@ -78,11 +78,27 @@ export default function MethodPage() {
 
       <h2>Who can help</h2>
       <p>
-        The plan is a small mixed integer program. It decides how many firefighters each country sends to cover what the
-        receiving country needs for the chosen scenario. Help goes in teams of 40, or as water bombers from countries that have
-        them. The rules on the left of the page become constraints: a donor cannot fall below a power of 50 after sending, and
-        countries fighting their own fires are skipped. Arrival time is the distance to the incident by road at about 80 km/h,
-        or by air for countries with an aerial fleet.
+        The plan only deals with fires, and with the fires actually detected on the replay day. Each fire asks for a number
+        of firefighters by its size so far: 50 under 200 detections, 500 from 200, 2,000 from 1,000. A unit, whether a
+        region or a country, is sustainable when its fires ask for at most one sixth of its firefighters: one of three shifts is on
+        duty, and half of it has to keep covering stations.
+      </p>
+      <p>Help is planned in three stages, and each stage only handles what the one before could not:</p>
+      <ul>
+        <li>Local: the region of each fire sends up to its sustainable sixth.</li>
+        <li>National: the country's other regions send their spare crews, nearest first.</li>
+        <li>
+          European: what is still missing comes from other countries. A donor serves its own fires first, keeps half of its spare
+          crews at home, and never ends up weaker than the country it helps. Among those, a mixed integer program picks the
+          fastest arrivals in teams of at least 20.
+        </li>
+      </ul>
+      <div className="formula">power = base power × (1 − firefighters asked for ÷ firefighters)</div>
+      <p>
+        The same formula is used for the map, the regions and the donors, so every firefighter that moves lowers the sender's
+        power and raises the receiver's. Crews travel by road at 65 km/h after 2 hours to mobilise, or by air when that is
+        faster: 6 hours to mobilise, 750 km/h, 2 hours to the fire. The fire load control multiplies what the receiving
+        country's fires ask for, to test a worse day.
       </p>
 
       <h2>Firefighters by region</h2>
@@ -97,7 +113,7 @@ export default function MethodPage() {
         The fire share is the region's part of the country's harmonized detections this month. A region with a third of the
         fire and a tenth of the firefighters ends up well below its country. With fewer than 20 detections in the country the
         factor only reflects how many firefighters the region has. In a plan, help leaves from the donor's region closest to
-        the fire, and the receiving region's own firefighters are shown next to the national figure.
+        the fire.
       </p>
 
       <h2>Fuel and dryness</h2>

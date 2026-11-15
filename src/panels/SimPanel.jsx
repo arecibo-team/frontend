@@ -1,6 +1,7 @@
 import { COUNTRY_NAMES } from "../lib/geo.js";
 import { num } from "../lib/format.js";
 import { ALERTS, ALERT_COLOR, HAZARDS, STORIES, summarize } from "../lib/sim.js";
+import { Section } from "./Insights.jsx";
 
 const NAMES = Object.entries(COUNTRY_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 
@@ -34,7 +35,7 @@ function ShockRow({ shock, onChange, onRemove }) {
       </div>
       <div className="stepper">
         <button type="button" onClick={() => set({ count: Math.max(1, shock.count - 1) })} aria-label="Fewer events">−</button>
-        <span className="mono">{shock.count}</span>
+        <span className="num">{shock.count}</span>
         <button type="button" onClick={() => set({ count: Math.min(10, shock.count + 1) })} aria-label="More events">+</button>
       </div>
       <button type="button" className="icon-btn" onClick={onRemove} aria-label="Remove hazard">×</button>
@@ -44,7 +45,7 @@ function ShockRow({ shock, onChange, onRemove }) {
 
 function Dumbbell({ rows }) {
   const changed = rows.filter(r => r.shocked || Math.abs(r.power_change) >= 1).sort((a, b) => a.power_change - b.power_change);
-  if (!changed.length) return <p className="small">No country's power changes in this scenario.</p>;
+  if (!changed.length) return <p className="quiet">No change</p>;
   return (
     <div className="dumbbells">
       {changed.map(r => {
@@ -59,10 +60,9 @@ function Dumbbell({ rows }) {
               <b className="db-before" style={{ left: `${a}%` }} />
               <b className="db-after" style={{ left: `${b}%` }} />
             </span>
-            <span className="db-val mono">
-              {Math.round(r.power_before)}→{Math.round(r.power_after)}
+            <span className="db-val num">
+              {Math.round(r.power_before)} → {Math.round(r.power_after)}
             </span>
-            {r.band_before !== r.band_after && <span className={`db-band band-${r.band_after.toLowerCase()}`}>{r.band_after}</span>}
           </div>
         );
       })}
@@ -73,114 +73,73 @@ function Dumbbell({ rows }) {
 export default function SimPanel({ draft, setDraft, onRun, result, error, loading, onHelp, wide, liveStory = [], liveLoading }) {
   const sum = result ? summarize(result.rows) : null;
   const run = list => onRun(list || draft);
+  const stories = [
+    { id: "live", title: "Hazards now, from GDACS", shocks: liveStory, off: liveLoading || !liveStory.length, live: true },
+    ...STORIES
+  ];
   return (
     <div className={`sim${wide ? " sim-wide" : ""}`}>
-      <section>
-        <h3 className="h3">Scenarios</h3>
-        <button
-          type="button"
-          className="story story-live"
-          disabled={loading || liveLoading || !liveStory.length}
-          onClick={() => { setDraft(liveStory); run(liveStory); }}
-        >
-          <b><i className="live-dot" />Hazards happening now</b>
-          <span>{liveLoading ? "Reading GDACS…" : liveStory.length ? "Every current GDACS alert in the EU, added to the replay day" : "No current GDACS alerts in the EU"}</span>
-          {liveStory.length > 0 && (
-            <span className="story-chips">
-              {[...new Set(liveStory.map(x => x.iso2))].slice(0, 10).map(c => (
-                <i key={c}>{c}</i>
-              ))}
-            </span>
-          )}
-        </button>
-        <div className="stories">
-          {STORIES.map(st => (
-            <button key={st.id} type="button" className="story" onClick={() => { setDraft(st.shocks); run(st.shocks); }} disabled={loading}>
-              <b>{st.title}</b>
-              <span>{st.text}</span>
-              <span className="story-chips">
-                {[...new Set(st.shocks.map(x => x.iso2))].map(c => (
-                  <i key={c}>{c}</i>
-                ))}
-              </span>
+      <div>
+        <Section title="Scenarios">
+          <ul className="picklist">
+            {stories.map(st => (
+              <li key={st.id}>
+                <button type="button" disabled={loading || st.off} onClick={() => { setDraft(st.shocks); run(st.shocks); }}>
+                  <span>{st.live && <i className="live-dot" />}{st.title}</span>
+                  <span className="quiet num">{[...new Set(st.shocks.map(x => x.iso2))].slice(0, 8).join(" ")}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <Section title="Hazards">
+          <div className="shocks">
+            {draft.map((x, i) => (
+              <ShockRow
+                key={i}
+                shock={x}
+                onChange={v => setDraft(draft.map((y, j) => (j === i ? v : y)))}
+                onRemove={() => setDraft(draft.filter((_, j) => j !== i))}
+              />
+            ))}
+          </div>
+          <div className="actions row">
+            <button type="button" className="btn" onClick={() => setDraft([...draft, { iso2: draft.at(-1)?.iso2 || "GR", type: "WF", alert: "Orange", count: 1 }])}>
+              Add hazard
             </button>
-          ))}
-        </div>
-        <h3 className="h3" style={{ marginTop: 18 }}>Hazards</h3>
-        <div className="shocks">
-          {draft.map((x, i) => (
-            <ShockRow
-              key={i}
-              shock={x}
-              onChange={v => setDraft(draft.map((y, j) => (j === i ? v : y)))}
-              onRemove={() => setDraft(draft.filter((_, j) => j !== i))}
-            />
-          ))}
-          <button
-            type="button"
-            className="add-shock"
-            onClick={() => setDraft([...draft, { iso2: draft.at(-1)?.iso2 || "GR", type: "WF", alert: "Orange", count: 1 }])}
-          >
-            + Add hazard
-          </button>
-        </div>
-        <button className="btn-dark" type="button" onClick={() => run()} disabled={loading || !draft.length} style={{ marginTop: 14 }}>
-          {loading ? "Simulating…" : "Run simulation"}
-        </button>
-        {error && <p className="notice">Could not run the simulation: {error.message}</p>}
-      </section>
+            <button className="btn-dark" type="button" onClick={() => run()} disabled={loading || !draft.length}>
+              Run simulation
+            </button>
+          </div>
+          {error && <p className="notice">Could not run the simulation: {error.message}</p>}
+        </Section>
+      </div>
 
       {result && sum && (
-        <section className="sim-result">
-          <h3 className="plan-head">
+        <div className="result">
+          <p className="lede">
             {sum.worst && sum.worst.power_change < -0.05
-              ? `${sum.worst.name} falls from ${Math.round(sum.worst.power_before)} to ${Math.round(sum.worst.power_after)}`
-              : "No country loses power"}
-          </h3>
-          <p className="small">
-            {sum.hit} {sum.hit === 1 ? "country" : "countries"} hit. EU average power {sum.avgBefore.toFixed(1)} → {sum.avgAfter.toFixed(1)}
+              ? `${sum.worst.name} falls from ${Math.round(sum.worst.power_before)} to ${Math.round(sum.worst.power_after)}.`
+              : "No country loses power."}
           </p>
-          <div className="sim-kpis">
-            <div>
-              <div className="label">Below 50</div>
-              <div className="big">
-                {sum.belowBefore}
-                <span className="arrow">→</span>
-                <em>{sum.belowAfter}</em>
-              </div>
-            </div>
-            <div>
-              <div className="label">Red band</div>
-              <div className="big">
-                {sum.redBefore}
-                <span className="arrow">→</span>
-                <em>{sum.redAfter}</em>
-              </div>
-            </div>
-            <div>
-              <div className="label">Firefighters tied up</div>
-              <div className="big">{num(sum.committed)}</div>
-            </div>
-            <div>
-              <div className="label">Need left uncovered</div>
-              <div className="big">{num(sum.unmet)}</div>
-            </div>
+          <div className="metrics">
+            <div className="metric"><span className="metric-v num">{sum.belowBefore}<span className="down"> → {sum.belowAfter}</span></span><span className="metric-l">Below 50</span></div>
+            <div className="metric"><span className="metric-v num">{sum.redBefore}<span className="down"> → {sum.redAfter}</span></span><span className="metric-l">Red band</span></div>
+            <div className="metric"><span className="metric-v num">{num(sum.committed)}</span><span className="metric-l">Crews tied up</span></div>
+            <div className="metric"><span className="metric-v num">{num(sum.unmet)}</span><span className="metric-l">Uncovered</span></div>
           </div>
-          <h3 className="h3">Power before and after</h3>
-          <div className="db-legend small">
-            <span><b className="db-before" /> before</span>
-            <span><b className="db-after" /> after</span>
-            <span><i className="db-fifty-key" /> 50</span>
-          </div>
-          <Dumbbell rows={result.rows} />
+          <Section title="Power" aside="before, after">
+            <Dumbbell rows={result.rows} />
+          </Section>
           {sum.worst && sum.worst.power_change < -0.05 && (
-            <button className="btn-dark" type="button" style={{ marginTop: 16 }} onClick={() => onHelp(sum.worst.iso2)}>
-              Find help for {sum.worst.name}
-            </button>
+            <div className="actions">
+              <button className="btn-dark" type="button" onClick={() => onHelp(sum.worst.iso2)}>
+                Find help for {sum.worst.name}
+              </button>
+            </div>
           )}
-        </section>
+        </div>
       )}
     </div>
   );
 }
-
