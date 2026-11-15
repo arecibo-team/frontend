@@ -118,8 +118,8 @@ function Training({ runs, refresh, horizon, onModelChanged }) {
   const [note, setNote] = useState(null);
   const [error, setError] = useState(null);
   const es = useRef(null);
-  const newest = runs?.runs?.[0]?.id;
   const running = Boolean(runs?.running);
+  const shown = runs?.active ?? runs?.runs?.[0]?.id;
 
   const connect = useCallback(() => {
     es.current?.close();
@@ -152,13 +152,13 @@ function Training({ runs, refresh, horizon, onModelChanged }) {
 
   useEffect(() => {
     if (running) connect();
-    else if (newest != null) {
-      api.firms.modelRun(newest).then(run => {
+    else if (shown != null) {
+      api.firms.modelRun(shown).then(run => {
         setHistory(run.loss_history || []);
         setTotal(run.rounds_total);
       }).catch(() => undefined);
     }
-  }, [running, newest]);
+  }, [running, shown]);
   useEffect(() => () => es.current?.close(), []);
 
   const act = fn => {
@@ -189,7 +189,7 @@ function Training({ runs, refresh, horizon, onModelChanged }) {
         <>
           <div className="fc-progress"><b style={{ width: `${((last?.round ?? 0) / (total || 1)) * 100}%` }} /></div>
           <div className="small num">
-            Round {last?.round ?? 0} of {total}
+            {running ? "Training" : `Run ${shown}${shown === runs?.active ? ", in use" : ""}`}: round {last?.round ?? 0} of {total}
             {last?.val != null ? `, validation loss ${last.val.toFixed(4)}` : ""}
           </div>
           <LossChart points={history} />
