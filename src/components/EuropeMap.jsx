@@ -319,18 +319,22 @@ export default function EuropeMap({
             <Polyline
               key={`base-${f.key}`}
               positions={curve(f.from, f.to)}
-              pathOptions={{ className: `flow-base flow-${f.kind} o${Math.min(f.order, 7)}`, weight: 1.5 + 5 * Math.sqrt(f.n / maxFlow), interactive: false }}
+              className={`flow-base flow-${f.kind} o${Math.min(f.order, 7)}`}
+              interactive={false}
+              pathOptions={{ weight: 1.5 + 5 * Math.sqrt(f.n / maxFlow) }}
             />
           ))}
           {flows.map(f => (
             <Polyline
               key={`run-${f.key}`}
               positions={curve(f.from, f.to)}
-              pathOptions={{ className: `flow-run flow-${f.kind} o${Math.min(f.order, 7)}`, weight: Math.max(1.5, 0.5 * (1.5 + 5 * Math.sqrt(f.n / maxFlow))), interactive: false }}
+              className={`flow-run flow-${f.kind} o${Math.min(f.order, 7)}`}
+              interactive={false}
+              pathOptions={{ weight: Math.max(1.5, 0.5 * (1.5 + 5 * Math.sqrt(f.n / maxFlow))) }}
             />
           ))}
           {flows.map(f => (
-            <CircleMarker key={`end-${f.key}`} center={f.from} radius={3} pathOptions={{ className: `flow-dot o${Math.min(f.order, 7)}`, weight: 0, fillOpacity: 1, interactive: false }} />
+            <CircleMarker key={`end-${f.key}`} center={f.from} radius={3} className={`flow-dot o${Math.min(f.order, 7)}`} interactive={false} pathOptions={{ weight: 0, fillOpacity: 1 }} />
           ))}
           {routes.map((r, i) =>
             r.from && r.to ? (

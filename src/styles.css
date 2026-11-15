@@ -472,3 +472,4 @@ ul, ol { list-style: none; }
 }
 .better { color: var(--good); font-weight: 500; }
 .worse { color: var(--ember-deep); }
+.flow-base, .flow-run { stroke-linejoin: round; }
