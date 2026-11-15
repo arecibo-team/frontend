@@ -1,14 +1,8 @@
 import { useMemo, useState } from "react";
-import { COUNTRY_NAMES } from "../lib/geo.js";
+import { ALL_NAMES } from "../lib/geo.js";
 
 export function Logo() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <path d="M3 9.5a8 8 0 0 0 16 0" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-      <path d="M11 4v11" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-      <circle cx="11" cy="3.2" r="1.9" fill="currentColor" />
-    </svg>
-  );
+  return <img className="brand-logo" src="/logo.png" alt="Arecibo" width="69" height="36" />;
 }
 
 function SearchIcon() {
@@ -26,7 +20,7 @@ export function Search({ onPick }) {
   const matches = useMemo(() => {
     const q = text.trim().toLowerCase();
     if (!q) return [];
-    return Object.entries(COUNTRY_NAMES)
+    return Object.entries(ALL_NAMES)
       .filter(([iso2, name]) => name.toLowerCase().includes(q) || iso2.toLowerCase() === q)
       .slice(0, 6);
   }, [text]);
