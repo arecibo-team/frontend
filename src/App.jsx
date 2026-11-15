@@ -16,7 +16,6 @@ import Busy, { useMinPending } from "./components/Busy.jsx";
 import { ALERT_COLOR, HAZARD_NAME, STORIES, decodeShocks, encodeShocks, toRequest } from "./lib/sim.js";
 import HelpPanel from "./panels/HelpPanel.jsx";
 import { REGION_LABEL, WeightsPanel, contextMonth } from "./panels/Insights.jsx";
-import MethodPage from "./panels/Method.jsx";
 import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
 import { MONTHS, dec, longDate, shortDay } from "./lib/format.js";
@@ -545,10 +544,6 @@ export default function App() {
             <Icon name="flask" />
             Science
           </a>
-          <button className="text-btn" type="button" onClick={() => setDialog("method")}>
-            <Icon name="book" />
-            Method
-          </button>
           <CopyLink />
           <Search onPick={selectCountry} />
         </div>
@@ -757,11 +752,6 @@ export default function App() {
       {dialog === "weights" && (
         <Dialog title="Weigh the Amber index yourself" onClose={() => setDialog(null)}>
           <WeightsPanel iso2={iso2} />
-        </Dialog>
-      )}
-      {dialog === "method" && (
-        <Dialog title="Method" onClose={() => setDialog(null)}>
-          <MethodPage />
         </Dialog>
       )}
       {dialog === "coords" && (
