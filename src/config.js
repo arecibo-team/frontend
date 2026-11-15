@@ -11,9 +11,7 @@ export const CAPITALS_MIN_ZOOM = 6;
 
 // Countries drawn on the map but not hoverable/clickable.
 export const NON_INTERACTIVE = new Set([
-  "Russia", "Turkey",
-  // South of Russia
-  "Georgia", "Armenia", "Azerbaijan", "Kazakhstan",
+  "Russia", "Kazakhstan",
   // North Africa
   "Morocco", "Algeria", "Tunisia", "Libya", "Egypt", "W. Sahara",
   // Middle East (also outside Europe)

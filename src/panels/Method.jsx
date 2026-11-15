@@ -132,7 +132,7 @@ export default function MethodPage() {
 
       <h2>Data</h2>
       <ul>
-        <li>NASA FIRMS country archives, MODIS Collection 6.1 and VIIRS S-NPP 375 m, 2000 to 2025</li>
+        <li>NASA FIRMS country archives, MODIS Collection 6.1 and VIIRS S-NPP 375 m, 2000 to 2025, for the EU-27 and 15 neighbours from the United Kingdom to Ukraine, Turkey and the Caucasus (fire record only, no Amber index)</li>
         <li>GDACS alerts for floods, storms, earthquakes, volcanoes and droughts</li>
         <li>Eurostat for firefighters, fire protection spending, population and land area</li>
         <li>OpenStreetMap fire stations through the Overpass API</li>
@@ -142,6 +142,14 @@ export default function MethodPage() {
         <li>CORINE Land Cover 2018, Copernicus DEM GLO-90, ERA5-Land soil moisture, MODIS NDVI and land surface temperature</li>
         <li>NASA POWER and DWD ICON fire weather, GDACS live alerts</li>
         <li>Natural Earth 1:10m country shapes</li>
+      </ul>
+      <h2>Research</h2>
+      <ul>
+        <li><a href="https://github.com/arecibo-team/research/blob/main/docs/project-idea.md" target="_blank" rel="noreferrer">Project idea</a></li>
+        <li><a href="https://github.com/arecibo-team/research/blob/main/Wildfire%20Data%20Sources.md" target="_blank" rel="noreferrer">Wildfire data sources</a></li>
+        <li><a href="https://github.com/arecibo-team/research/blob/docs/feature-catalog/docs/feature-catalog.md" target="_blank" rel="noreferrer">Feature catalog</a></li>
+        <li><a href="https://github.com/arecibo-team/research/blob/docs/feature-catalog/docs/literature-study.md" target="_blank" rel="noreferrer">Literature study</a></li>
+        <li><a href="https://github.com/arecibo-team/data-science/blob/main/apis/README.md" target="_blank" rel="noreferrer">Every API endpoint</a></li>
       </ul>
       <p className="small">
         We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System

@@ -15,6 +15,21 @@ export const COUNTRY_NAMES = {
   SK: "Slovakia", SI: "Slovenia", ES: "Spain", SE: "Sweden"
 };
 
+export const NEIGHBOURS = {
+  "804": "UA", "498": "MD", "112": "BY", "826": "GB", "578": "NO", "756": "CH", "688": "RS", "070": "BA", "499": "ME",
+  "008": "AL", "792": "TR", "268": "GE", "051": "AM", "031": "AZ"
+};
+
+export const NEIGHBOUR_NAMES = {
+  UA: "Ukraine", MD: "Moldova", BY: "Belarus", GB: "United Kingdom", NO: "Norway", CH: "Switzerland", RS: "Serbia",
+  BA: "Bosnia and Herzegovina", ME: "Montenegro", AL: "Albania", XK: "Kosovo", TR: "Turkey", GE: "Georgia", AM: "Armenia",
+  AZ: "Azerbaijan"
+};
+
+export const ALL_NAMES = { ...COUNTRY_NAMES, ...NEIGHBOUR_NAMES };
+
+export const codeOf = f => EU[f.id] || NEIGHBOURS[f.id] || (f.properties?.name === "Kosovo" ? "XK" : null);
+
 const VIEW = { west: -40, east: 60, south: 22, north: 82 };
 
 const all = feature(world, world.objects.countries).features;
@@ -26,7 +41,7 @@ export const COUNTRIES = all
     if (w > e) return true;
     return e >= VIEW.west && w <= VIEW.east && n >= VIEW.south && s <= VIEW.north;
   })
-  .map(f => ({ ...f, iso2: EU[f.id] || null }));
+  .map(f => ({ ...f, iso2: codeOf(f) }));
 
 export const POWER_STEPS = [35, 50, 65, 80];
 export const POWER_COLORS = ["#e6edf6", "#c3d4e8", "#8faed4", "#4e7eb3", "#244f80"];

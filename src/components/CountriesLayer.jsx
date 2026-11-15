@@ -3,7 +3,7 @@ import { GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import { getCountries, displayName } from "../lib/countries.js";
 import { EUROPE_BOUNDS, FLY_DURATION } from "../config.js";
-import { EU } from "../lib/geo.js";
+import { codeOf } from "../lib/geo.js";
 
 const passiveStyle = { color: "#9aa3b2", weight: 0.8, opacity: 0.6, fill: false };
 const hiddenStyle = { opacity: 0, fillOpacity: 0 };
@@ -19,7 +19,7 @@ function flyToCountry(map, layer) {
   map.flyToBounds(clipped, { padding: [30, 30], maxZoom: 6, duration: FLY_DURATION });
 }
 
-const isoOf = f => EU[f.id] || null;
+const isoOf = codeOf;
 
 export default function CountriesLayer({ fill, outline, hatch, selected, bordersOn, onSelect, flyOnSelect }) {
   const map = useMap();
@@ -81,7 +81,6 @@ export default function CountriesLayer({ fill, outline, hatch, selected, borders
 
   return (
     <>
-      {/* Russia, Turkey, North Africa, Middle East: outline only, no hover/click. */}
       <GeoJSON ref={passiveRef} data={passive} style={passiveStyle} interactive={false} />
       <GeoJSON ref={layerRef} data={interactive} style={f => latest.current.styleFor(f)} onEachFeature={onEachFeature} />
     </>
