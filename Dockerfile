@@ -13,5 +13,5 @@ RUN npm run build
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-ENV AMBER_UPSTREAM=http://amber-api:8001 FIRMS_UPSTREAM=http://firms-server:8002
+ENV AMBER_UPSTREAM=http://amber-api:8001 FIRMS_UPSTREAM=http://firms-server:8002 CONTEXT_UPSTREAM=http://context-api:8003
 EXPOSE 80

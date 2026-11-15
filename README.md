@@ -9,12 +9,19 @@ left after the hazards it is already dealing with, and which countries could sen
 
 One screen built around the EU map.
 
+- **Map layers**: Power, Amber index, **Regions** (each country split into north, east, south and west, coloured by
+  regional firefighting power from the regional firefighter estimates and this month's fire), and **Dryness** (soil
+  moisture deficit and land heat against 2001–2020 on a 1° grid, Jan 2024 to Oct 2026).
 - **Map**: click a country, or press Draw area and drag a box. Coordinates takes a box in degrees, or a point and a
   distance. The map shows firefighting power or the Amber index for the replay day, with the active fires.
 - **Timeline** under the map: harmonized fire cell-days for the selected area, by day for one year or by month for
   2001–2025. Drag across it to select a date range, click a day to replay it.
-- **Active fires** sidebar: every fire on the replay day, ranked against the 2001–2020 median of the area around it.
-- **Area** sidebar: Now (power, rank, is this normal, outlook, largest fires), Calendar (harmonized or raw sensors,
+- **Active fires** sidebar: selecting a fire shows the fire weather at its last satellite pass and the land cover and
+  terrain around it.
+- **Active fires** list: every fire on the replay day, ranked against the 2001–2020 median of the area around it.
+- **Area** sidebar: Now (power, rank, firefighters by region with the most stretched region called out, is this
+  normal, fuel and dryness, why this score from the model's SHAP reasons, index and power over the years, outlook,
+  largest fires, and a dialog to weigh the index yourself), Calendar (harmonized or raw sensors,
   click a month to select it, shift-click to extend) and Range (comparison with the same dates in every year, fires,
   and CSV exports of every hotspot, daily counts and the monthly calendar).
 - **Simulate** sidebar: start from the replay day and add hazards (fire, flood, quake, drought, storm, volcano) to any
@@ -52,6 +59,10 @@ Vite proxies `/api` to the FIRMS server (`FIRMS_PROXY` changes the target). Buil
 | --- | --- | --- |
 | `VITE_API_URL` | `http://127.0.0.1:8000` (`/amber` in the Docker image) | Amber API base |
 | `VITE_FIRMS_URL` | empty, same origin | FIRMS server base |
+| `VITE_CONTEXT_URL` | `/context` | Context API base (Vite proxies it to port 8003 in development) |
+
+`scripts/build-regions.mjs` rebuilds the region shapes (`src/data/eu-regions.json`) and the anchors the Amber API uses
+(`node scripts/build-regions.mjs ../data-science/amber-index/amber/regions_geo.json`).
 
 ## Data
 
