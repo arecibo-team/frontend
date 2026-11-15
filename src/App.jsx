@@ -195,7 +195,8 @@ export default function App() {
   const tlEnd = tlMode === "all" ? DATA_TO : iso(tlYear, 12, 31) > DATA_TO ? DATA_TO : iso(tlYear, 12, 31);
   const tlStart = tlMode === "all" ? "2001-01-01" : iso(tlYear, 1, 1);
 
-  const replay = useFetch(() => api.replay(replayDate), [replayDate]);
+  const firesFrom = params.from && params.to && from < replayDate ? from : null;
+  const replay = useFetch(() => api.replay(replayDate, firesFrom), [replayDate, firesFrom]);
   const area = useFetch(() => api.area(query), [iso2, query.box, from, to, asof]);
   const timeline = useFetch(() => api.area({ country: iso2, box: query.box, from: tlStart, to: tlEnd, asof: tlEnd }), [iso2, query.box, tlStart, tlEnd]);
 
@@ -549,7 +550,7 @@ export default function App() {
 
       <div className="ws-body">
         {left && (
-          <Sidebar side="left" title="Active fires" sub={rd ? `${rd.counts.all} in Europe` : null} onClose={() => setParams({ left: "0" })}>
+          <Sidebar side="left" title={firesFrom ? "Fires in the interval" : "Active fires"} sub={rd ? `${rd.counts.all} in Europe` : null} onClose={() => setParams({ left: "0" })}>
             {() => (
               <FiresPanel
                 data={rd}

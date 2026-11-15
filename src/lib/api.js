@@ -42,7 +42,7 @@ export function firmsQuery({ from, to, bounds }) {
 }
 
 export const api = {
-  replay: date => request(`/replay?date=${date}`),
+  replay: (date, start) => request(`/replay?date=${date}${start ? `&start=${start}` : ""}`),
   history: (iso2, date) => request(`/history/${iso2}?date=${date}`),
   historyCsvUrl: (iso2, date) => `${API_URL}/history/${iso2}.csv?date=${date}`,
   area: q => request(`/area?${areaQuery(q)}`),
