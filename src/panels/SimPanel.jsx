@@ -70,13 +70,29 @@ function Dumbbell({ rows }) {
   );
 }
 
-export default function SimPanel({ draft, setDraft, onRun, result, error, loading, onHelp, wide }) {
+export default function SimPanel({ draft, setDraft, onRun, result, error, loading, onHelp, wide, liveStory = [], liveLoading }) {
   const sum = result ? summarize(result.rows) : null;
   const run = list => onRun(list || draft);
   return (
     <div className={`sim${wide ? " sim-wide" : ""}`}>
       <section>
         <h3 className="h3">Scenarios</h3>
+        <button
+          type="button"
+          className="story story-live"
+          disabled={loading || liveLoading || !liveStory.length}
+          onClick={() => { setDraft(liveStory); run(liveStory); }}
+        >
+          <b><i className="live-dot" />Hazards happening now</b>
+          <span>{liveLoading ? "Reading GDACS…" : liveStory.length ? "Every current GDACS alert in the EU, added to the replay day" : "No current GDACS alerts in the EU"}</span>
+          {liveStory.length > 0 && (
+            <span className="story-chips">
+              {[...new Set(liveStory.map(x => x.iso2))].slice(0, 10).map(c => (
+                <i key={c}>{c}</i>
+              ))}
+            </span>
+          )}
+        </button>
         <div className="stories">
           {STORIES.map(st => (
             <button key={st.id} type="button" className="story" onClick={() => { setDraft(st.shocks); run(st.shocks); }} disabled={loading}>

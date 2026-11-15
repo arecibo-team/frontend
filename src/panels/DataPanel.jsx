@@ -41,7 +41,7 @@ function Days({ days }) {
   );
 }
 
-export default function DataPanel({ summary, sources, pipeline, query, rangeLabel, areaLabel, onImport, importing, importResult, importError, layers, setLayers }) {
+export default function DataPanel({ summary, sources, pipeline, modelRuns, query, rangeLabel, areaLabel, onImport, importing, importResult, importError, layers, setLayers }) {
   const input = useRef(null);
   const [drag, setDrag] = useState(false);
   const s = summary.data;
@@ -162,6 +162,27 @@ export default function DataPanel({ summary, sources, pipeline, query, rangeLabe
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="block">
+        <h3 className="h3">Forecast model</h3>
+        {modelRuns?.data?.runs?.length ? (
+          <ul className="steps">
+            {modelRuns.data.runs.slice(0, 4).map(run => (
+              <li key={run.id} className={`step-${run.status === "done" ? "done" : run.status === "running" ? "running" : "failed"}`}>
+                <i />
+                <span>Run {run.id}</span>
+                <span className="small">{run.status}</span>
+                <b className="mono">{run.finished_at ? run.finished_at.slice(0, 10) : ""}</b>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="small">
+            The LightGBM fire forecast and the country risk model are not trained in this deployment. They need the weather step,
+            then <span className="mono">POST /api/model/train</span>. Their APIs are listed in apis/README.md.
+          </p>
         )}
       </section>
 

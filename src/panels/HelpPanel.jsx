@@ -1,6 +1,7 @@
 import { COUNTRY_NAMES } from "../lib/geo.js";
 import { dayMonth, hours, possessive } from "../lib/format.js";
 import { SCENARIOS, headline, leftOutSentence } from "../lib/plan.js";
+import { REGION_LABEL } from "./Insights.jsx";
 
 function Bar({ label, value, color }) {
   return (
@@ -63,6 +64,14 @@ export default function HelpPanel({ form, setForm, onRun, plan, error, loading, 
       {plan && (
         <div className="help-result">
           <h3 className="plan-head">{headline(plan)}</h3>
+          {r.region && (
+            <div className="region-note">
+              <span className="region-tag">{REGION_LABEL[r.region]} {r.name}</span>
+              {r.region_firefighters != null
+                ? `${Math.round(r.region_firefighters).toLocaleString("en-GB")} firefighters there, ${Math.round(r.region_share * 100)}% of the country`
+                : "no regional estimate"}
+            </div>
+          )}
           <div className="block">
             <h3 className="h3">{possessive(r.name)} power</h3>
             <div className="power-bars">
@@ -79,7 +88,7 @@ export default function HelpPanel({ form, setForm, onRun, plan, error, loading, 
                   <span className="n">{i + 1}</span>
                   <span className="who">{d.name}</span>
                   <span className="eta">{hours(d.eta_h)}</span>
-                  <span className="what">{d.resources}</span>
+                  <span className="what">{d.resources}{d.region ? `, from the ${d.region}` : ""}</span>
                   <span className="pw">
                     {Math.round(d.power_before)} to {Math.round(d.power_after)}
                   </span>

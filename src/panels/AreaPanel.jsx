@@ -5,6 +5,7 @@ import { MONTHS, MONTHS_SHORT, dec, longDate, monthYear, num, ordinal, parseDate
 import { BAND_COLORS } from "../lib/geo.js";
 import { DATA_FROM, DATA_TO, clampDate, iso, lastDay, presets } from "../lib/dates.js";
 import { historySentence, normalSentence } from "../lib/sentences.js";
+import { ContextCard, ReasonsCard, RegionsCompass, TrendCard } from "./Insights.jsx";
 
 const RAMP = ["#fde9d9", "#fbcfa9", "#f6ad75", "#ec8346", "#d9581f", "#a63a10"];
 
@@ -274,7 +275,7 @@ function Range({ data, query, from, to, asof, setParams }) {
   );
 }
 
-function Now({ data, country, onHelp }) {
+function Now({ data, country, onHelp, regions, focusRegion, box, onWeights }) {
   const n = data.normal;
   const o = data.outlook;
   const refLabel = country ? longDate(country.ref).replace(/ \d{4}$/, "") : "";
@@ -305,6 +306,7 @@ function Now({ data, country, onHelp }) {
           </div>
         </>
       )}
+      {country && <RegionsCompass iso2={country.iso2} rows={regions?.data?.regions} power={country.power} focusRegion={focusRegion} loading={regions?.loading} />}
       <div className="block">
         <h3 className="h3">Is this normal</h3>
         <p className="normal-text">{country ? normalSentence(n, data.name) : `${historySentence(n)}.`}</p>
@@ -312,6 +314,9 @@ function Now({ data, country, onHelp }) {
           Usual {MONTHS[n.month - 1]}: {num(n.usual_low)} to {num(n.usual_high)} cell-days
         </p>
       </div>
+      <ContextCard iso2={country ? country.iso2 : null} box={country ? null : box} date={data.date} />
+      {country && <ReasonsCard iso2={country.iso2} />}
+      {country && <TrendCard iso2={country.iso2} />}
       {country && (
         <div className="block">
           <h3 className="h3">What drives the score</h3>
@@ -364,16 +369,25 @@ function Now({ data, country, onHelp }) {
           {data.analog && <p className="small" style={{ marginTop: 10 }}>Closest year so far: {data.analog.year}</p>}
         </div>
       )}
-      {country && onHelp && (
-        <button className="btn-dark" type="button" onClick={onHelp} style={{ marginTop: 6 }}>
-          Find countries that can help
-        </button>
+      {country && (
+        <div className="now-actions">
+          {onHelp && (
+            <button className="btn-dark" type="button" onClick={onHelp}>
+              Find countries that can help
+            </button>
+          )}
+          {onWeights && (
+            <button className="btn" type="button" onClick={onWeights}>
+              Adjust the index weights
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-export default function AreaPanel({ data, error, loading, country, wide, tab, mode, from, to, asof, query, setParams, onHelp }) {
+export default function AreaPanel({ data, error, loading, country, wide, tab, mode, from, to, asof, query, setParams, onHelp, regions, focusRegion, box, onWeights }) {
   const [localTab, setLocalTab] = useState(tab || "now");
   useEffect(() => setLocalTab(tab || "now"), [tab]);
   if (error) return <p className="notice">Could not load this area: {error.message}</p>;
@@ -389,7 +403,7 @@ export default function AreaPanel({ data, error, loading, country, wide, tab, mo
     </div>
   );
   const range = <Range data={data} query={query} from={from} to={to} asof={asof} setParams={setParams} />;
-  const now = <Now data={data} country={country} onHelp={onHelp} />;
+  const now = <Now data={data} country={country} onHelp={onHelp} regions={regions} focusRegion={focusRegion} box={box} onWeights={onWeights} />;
   if (wide) {
     return (
       <div className={`area-wide${loading ? " busy" : ""}`}>

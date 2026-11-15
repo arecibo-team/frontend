@@ -1,14 +1,16 @@
 import Segmented from "../components/Segmented.jsx";
 import { num, ratio } from "../lib/format.js";
+import { FireDetail, REGION_LABEL } from "./Insights.jsx";
 
 const FILTERS = [["all", "All"], ["above", "Above normal"], ["watch", "Watch"]];
 const STATUS_COLOR = { above: "#d9480f", watch: "#e7a33e", normal: "#c5c8cd" };
 
-export default function FiresPanel({ data, filter, onFilter, selectedId, onPick }) {
+export default function FiresPanel({ data, filter, onFilter, selectedId, selectedFire, onPick }) {
   const fires = data?.fires || [];
   const shown = filter === "all" ? fires : fires.filter(f => f.status === filter);
   return (
     <div className="fires">
+      {selectedFire && <FireDetail key={selectedFire.id} fire={selectedFire} />}
       <div className="fires-filter">
         <Segmented options={FILTERS} value={filter} onChange={onFilter} full label="Filter fires" />
       </div>
@@ -20,7 +22,7 @@ export default function FiresPanel({ data, filter, onFilter, selectedId, onPick 
             {ratio(f.ratio)}
           </span>
           <span className="meta">
-            {f.country}, {num(f.detections)} hotspots, day {f.day}
+            {f.region ? `${REGION_LABEL[f.region]} ` : ""}{f.country}, {num(f.detections)} hotspots, day {f.day}
           </span>
           <span className="pass">
             {f.last_sensor} {f.last_time}

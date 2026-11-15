@@ -13,6 +13,7 @@ import DataPanel from "./panels/DataPanel.jsx";
 import Busy, { useMinPending } from "./components/Busy.jsx";
 import { ALERT_COLOR, HAZARD_NAME, STORIES, decodeShocks, encodeShocks, toRequest } from "./lib/sim.js";
 import HelpPanel from "./panels/HelpPanel.jsx";
+import { REGION_LABEL, WeightsPanel, contextMonth } from "./panels/Insights.jsx";
 import MethodPage from "./panels/Method.jsx";
 import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
@@ -43,9 +44,41 @@ function useParams() {
   return [params, update];
 }
 
-const EU_BOX = "-32,27,45,72";
+const DRY_STEPS = [-1.5, -0.5, 0.5, 1.5];
+const DRY_COLORS = ["#2f62a8", "#9cbde0", "#efefea", "#f2b27c", "#c2410c"];
+const NEUTRAL = "#e7eaef";
+const REGION_STEPS = [20, 35, 50, 65];
+const REGION_COLORS = ["#c2410c", "#f2a46b", "#ebe6dc", "#8faed4", "#244f80"];
 
-function MapLegend({ layer, help, title, bubbles = true }) {
+function liveShocks(events) {
+  const groups = {};
+  (events || []).forEach(e => {
+    if (!COUNTRY_NAMES[e.iso2] || !HAZARD_NAME[e.type]) return;
+    const key = `${e.iso2}|${e.type}|${e.alert}`;
+    groups[key] = (groups[key] || 0) + 1;
+  });
+  return Object.entries(groups)
+    .map(([k, n]) => {
+      const [iso2, type, alert] = k.split("|");
+      return { iso2, type, alert, count: Math.min(10, n) };
+    })
+    .sort((a, b) => (b.alert === "Red") - (a.alert === "Red") || b.count - a.count)
+    .slice(0, 12);
+}
+
+function MapLegend({ layer, help, title, bubbles = true, month }) {
+  if (layer === "dryness") {
+    return (
+      <div className="map-legend floating">
+        <div>
+          <div className="legend-title">Dryness{month ? `, ${month}` : ""}</div>
+          <div className="ramp">{DRY_COLORS.map(c => <span key={c} style={{ background: c }} />)}</div>
+          <div className="ramp-ticks ramp-ends"><span>wetter</span><span>usual</span><span>drier</span></div>
+        </div>
+        <div className="small" style={{ maxWidth: 190 }}>Soil moisture deficit and land heat against 2001–2020, on a 1° grid</div>
+      </div>
+    );
+  }
   if (help) {
     return (
       <div className="map-legend floating">
@@ -55,13 +88,13 @@ function MapLegend({ layer, help, title, bubbles = true }) {
       </div>
     );
   }
-  const power = layer === "power";
-  const steps = power ? [0, ...POWER_STEPS] : [0, ...AMBER_STEPS];
-  const colors = power ? POWER_COLORS : AMBER_COLORS;
+  const power = layer === "power" || layer === "regions";
+  const steps = layer === "regions" ? [0, ...REGION_STEPS] : power ? [0, ...POWER_STEPS] : [0, ...AMBER_STEPS];
+  const colors = layer === "regions" ? REGION_COLORS : power ? POWER_COLORS : AMBER_COLORS;
   return (
     <div className="map-legend floating">
       <div>
-        <div className="legend-title">{title || (power ? "Power" : "Amber index")}</div>
+        <div className="legend-title">{title || (layer === "regions" ? "Power by region" : power ? "Power" : "Amber index")}</div>
         <div className="ramp">{colors.map(c => <span key={c} style={{ background: c }} />)}</div>
         <div className="ramp-ticks">{steps.map(s => <span key={s}>{s}</span>)}</div>
       </div>
@@ -106,7 +139,7 @@ export default function App() {
   const [params, setParams] = useParams();
   const date = clampDate(params.date || DEFAULT_DATE);
   const replayDate = clampReplay(date);
-  const layer = params.layer === "amber" ? "amber" : "power";
+  const layer = ["amber", "regions", "dryness"].includes(params.layer) ? params.layer : "power";
   const showFires = params.fires !== "0";
   const filter = ["above", "watch"].includes(params.filter) ? params.filter : "all";
   const left = params.left !== "0";
@@ -232,6 +265,19 @@ export default function App() {
   };
   const busyImport = useMinPending(importing, 1100);
 
+  const ctxMonth = contextMonth(replayDate);
+  const mapLayer = layer === "dryness" && !ctxMonth ? "power" : layer;
+  const needRegions = mapLayer === "regions" || (right === "area" && !box);
+  const regionsData = useFetch(() => (needRegions ? api.regions(replayDate) : Promise.resolve(null)), [needRegions, replayDate]);
+  const [regionGeo, setRegionGeo] = useState(null);
+  useEffect(() => {
+    if (mapLayer === "regions" && !regionGeo) import("./data/eu-regions.json").then(m => setRegionGeo(m.default));
+  }, [mapLayer]);
+  const dryGrid = useFetch(() => (mapLayer === "dryness" ? api.context.grid("dryness", ctxMonth) : Promise.resolve(null)), [mapLayer, ctxMonth]);
+  const live = useFetch(() => (right === "sim" ? api.live() : Promise.resolve(null)), [right === "sim"]);
+  const liveStory = useMemo(() => liveShocks(live.data?.events), [live.data]);
+  const modelRuns = useFetch(() => (dataOpen ? api.firms.modelRuns() : Promise.resolve(null)), [dataOpen]);
+
   const rd = replay.data;
   const byIso = useMemo(() => Object.fromEntries((rd?.countries || []).map(c => [c.iso2, c])), [rd]);
   const fires = rd?.fires || [];
@@ -264,9 +310,10 @@ export default function App() {
       if (code === p.recipient.iso2) return classColor(p.recipient.power_with_help, POWER_STEPS, POWER_COLORS);
       return "#e4e8ee";
     }
+    if (mapLayer === "regions" || mapLayer === "dryness") return NEUTRAL;
     const c = byIso[code];
     if (!c) return "#dfe3e8";
-    return layer === "power" ? classColor(c.power, POWER_STEPS, POWER_COLORS) : classColor(c.amber, AMBER_STEPS, AMBER_COLORS);
+    return mapLayer === "power" ? classColor(c.power, POWER_STEPS, POWER_COLORS) : classColor(c.amber, AMBER_STEPS, AMBER_COLORS);
   };
 
   const selectCountry = code => {
@@ -288,6 +335,35 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  const regionRows = useMemo(() => Object.fromEntries((regionsData.data?.regions || []).map(r => [`${r.iso2}-${r.region}`, r])), [regionsData.data]);
+  const focusRegion = selectedFire?.region || (iso2 ? fires.filter(f => f.iso2 === iso2).sort((a, b) => b.detections - a.detections)[0]?.region : null);
+  const regionShapes =
+    mapLayer === "regions" && regionGeo && regionsData.data && !s && !p
+      ? {
+          key: `regions-${regionsData.data.date}`,
+          data: regionGeo,
+          style: f => {
+            const r = regionRows[`${f.properties.iso2}-${f.properties.region}`];
+            return {
+              color: "#ffffff", weight: 1.2, fillOpacity: r?.available ? 0.92 : 0.4,
+              fillColor: r?.available ? classColor(r.power, REGION_STEPS, REGION_COLORS) : "#dfe3e8"
+            };
+          },
+          tooltip: f => {
+            const r = regionRows[`${f.properties.iso2}-${f.properties.region}`];
+            if (!r) return "";
+            if (!r.available) return `<b>${REGION_LABEL[r.region]} ${r.name}</b><br>No regional estimate`;
+            const fire = r.fire_share != null ? `${Math.round(r.fire_share * 100)}% of this month's fire` : "little fire this month";
+            return `<b>${REGION_LABEL[r.region]} ${r.name}</b><br>${Math.round(r.firefighters).toLocaleString("en-GB")} firefighters, ${Math.round(r.share * 100)}% of the country<br>${fire}${r.active_fires ? `, ${r.active_fires} active` : ""}<br>Power <b>${Math.round(r.power)}</b>`;
+          },
+          onClick: props => selectCountry(props.iso2)
+        }
+      : null;
+  const cells =
+    mapLayer === "dryness" && dryGrid.data && !s && !p
+      ? { key: `dry-${dryGrid.data.month}`, res: dryGrid.data.res_deg, data: dryGrid.data.cells, color: v => classColor(v, DRY_STEPS, DRY_COLORS), opacity: 0.8 }
+      : null;
 
   const areaTitle = box ? "Custom area" : COUNTRY_NAMES[iso2];
   const areaSub = box
@@ -349,6 +425,7 @@ export default function App() {
                 filter={filter}
                 onFilter={f => setParams({ filter: f === "all" ? undefined : f })}
                 selectedId={selectedFire?.id}
+                selectedFire={selectedFire}
                 onPick={f => setParams({ c: f.iso2, box: undefined, fire: f.id, right: right === "help" ? "help" : undefined })}
               />
             )}
@@ -360,7 +437,17 @@ export default function App() {
             {s ? (
               <Segmented options={[["before", "Before"], ["after", "After"]]} value={simView} onChange={v => setParams({ view: v === "after" ? undefined : v })} label="Simulation view" />
             ) : right !== "help" ? (
-              <Segmented options={[["power", "Power"], ["amber", "Amber index"]]} value={layer} onChange={v => setParams({ layer: v === "power" ? undefined : v })} label="Map layer" />
+              <Segmented
+                options={[
+                  ["power", "Power"],
+                  ["amber", "Amber"],
+                  ["regions", "Regions"],
+                  ["dryness", "Dryness", !ctxMonth, ctxMonth ? "Soil moisture and land heat anomalies" : "Dryness data covers Jan 2024 to Oct 2026"]
+                ]}
+                value={mapLayer}
+                onChange={v => setParams({ layer: v === "power" ? undefined : v })}
+                label="Map layer"
+              />
             ) : null}
             {!s && !p && (
               <label className="check check-ink">
@@ -368,18 +455,18 @@ export default function App() {
                 Fires
               </label>
             )}
-            <button className={`tool${detectionsOn ? " on-soft" : ""}`} type="button" aria-pressed={detectionsOn} onClick={() => setParams({ det: detectionsOn ? undefined : "1" })}>
+            <button className={`tool${detectionsOn ? " on-soft" : ""}`} type="button" aria-pressed={detectionsOn} aria-label="Detections" title="MODIS and VIIRS detections" onClick={() => setParams({ det: detectionsOn ? undefined : "1" })}>
               <Icon name="layers" />
-              Detections
+              <span className="tool-label">Detections</span>
             </button>
             <span className="tool-sep" />
-            <button className={`tool${drawing ? " on" : ""}`} type="button" aria-pressed={drawing} onClick={() => setDrawing(d => !d)}>
+            <button className={`tool${drawing ? " on" : ""}`} type="button" aria-pressed={drawing} aria-label={drawing ? "Cancel" : "Draw area"} title="Draw an area on the map" onClick={() => setDrawing(d => !d)}>
               <Icon name="draw" />
-              {drawing ? "Cancel" : "Draw area"}
+              <span className="tool-label">{drawing ? "Cancel" : "Draw area"}</span>
             </button>
-            <button className="tool" type="button" onClick={() => setDialog("coords")}>
+            <button className="tool" type="button" aria-label="Coordinates" title="Enter coordinates" onClick={() => setDialog("coords")}>
               <Icon name="target" />
-              Coordinates
+              <span className="tool-label">Coordinates</span>
             </button>
           </div>
           {replay.error && <p className="notice floating-notice">Could not load {longDate(replayDate)}: {replay.error.message}</p>}
@@ -388,6 +475,8 @@ export default function App() {
             selected={s ? null : p ? p.recipient.iso2 : iso2}
             outline={s ? [...new Set(simShocks.map(x => x.iso2))] : p ? p.donors.map(d => d.iso2) : []}
             badges={badges}
+            regionShapes={regionShapes}
+            cells={cells}
             tiles={tileUrl}
             incidents={incidentsOn && incidentData.data ? { key: `${from}-${to}-${dataVersion}-${incidentData.data.features.length}`, data: incidentData.data } : null}
             hatch={p ? p.left_out.map(l => l.iso2) : []}
@@ -397,14 +486,14 @@ export default function App() {
             fires={showFires && !p && !s ? fires : []}
             callout={showFires && !p && !s && calloutFire ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)}× the ${month} median` } : null}
             flyTo={selectedFire ? [selectedFire.lat, selectedFire.lon] : null}
-            focus={p ? [p.incident, ...p.donors.map(d => CENTROIDS[d.iso2]).filter(Boolean)] : box ? [[box[1], box[0]], [box[3], box[2]]] : null}
+            focus={p ? [p.incident, ...p.donors.map(d => d.departure || CENTROIDS[d.iso2]).filter(Boolean)] : box ? [[box[1], box[0]], [box[3], box[2]]] : null}
             flyOnSelect
             drawing={drawing}
             onDraw={setBox}
             box={box}
             ariaLabel="Map of the EU"
           />
-          <MapLegend layer={s ? "power" : layer} help={Boolean(p)} title={s ? `Power, ${simView}` : null} bubbles={showFires && !s} />
+          <MapLegend layer={s ? "power" : mapLayer} help={Boolean(p)} title={s ? `Power, ${simView}` : null} bubbles={showFires && !s && mapLayer !== "dryness"} month={dryGrid.data?.month ? new Date(`${dryGrid.data.month}-01`).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null} />
         </div>
 
         {right === "area" && (
@@ -424,6 +513,10 @@ export default function App() {
                 query={query}
                 setParams={setParams}
                 onHelp={() => setParams({ right: "help", hc: iso2 })}
+                regions={regionsData}
+                focusRegion={focusRegion}
+                box={box}
+                onWeights={() => setDialog("weights")}
               />
             )}
           </Sidebar>
@@ -440,6 +533,8 @@ export default function App() {
                 loading={sim.loading}
                 wide={wide}
                 onHelp={code => setParams({ right: "help", hc: code })}
+                liveStory={liveStory}
+                liveLoading={live.loading}
               />
             )}
           </Sidebar>
@@ -458,6 +553,7 @@ export default function App() {
                 importing={importing}
                 importResult={importResult}
                 importError={importError}
+                modelRuns={modelRuns}
                 layers={layers}
                 setLayers={l => {
                   setLayers(l);
@@ -493,6 +589,11 @@ export default function App() {
       <Busy show={busyImport} title="Importing FIRMS data" steps={["Reading the CSV", "Sorting rows by satellite and product", "Starting the harmonization pipeline"]} />
       <Busy show={busyPlan && !busySim} title="Planning assistance" steps={["Checking who has power to spare", "Solving the assignment", "Timing the routes"]} />
 
+      {dialog === "weights" && (
+        <Dialog title="Weigh the Amber index yourself" onClose={() => setDialog(null)}>
+          <WeightsPanel iso2={iso2} />
+        </Dialog>
+      )}
       {dialog === "method" && (
         <Dialog title="Method" onClose={() => setDialog(null)}>
           <MethodPage />

@@ -85,6 +85,35 @@ export default function MethodPage() {
         or by air for countries with an aerial fleet.
       </p>
 
+      <h2>Firefighters by region</h2>
+      <p>
+        National firefighter numbers hide where the crews are. For 26 countries we use regional estimates of the national
+        total in four parts: north, east, south and west. Each country is split by bearing from the centroid of its main land
+        mass, so every fire and every detection falls in exactly one region. Austria's regional estimates add up to less
+        than its national total, so we keep their proportions and scale them to it. Malta has no estimate.
+      </p>
+      <div className="formula">regional power = country power × clamp(firefighter share ÷ fire share, 0.4, 1.6)</div>
+      <p>
+        The fire share is the region's part of the country's harmonized detections this month. A region with a third of the
+        fire and a tenth of the firefighters ends up well below its country. With fewer than 20 detections in the country the
+        factor only reflects how many firefighters the region has. In a plan, help leaves from the donor's region closest to
+        the fire, and the receiving region's own firefighters are shown next to the national figure.
+      </p>
+
+      <h2>Fuel and dryness</h2>
+      <p>
+        Land cover comes from CORINE 2018 (forest, shrub and grassland count as wildland fuel) and terrain from the
+        Copernicus 90 m elevation model. Monthly soil moisture comes from ERA5-Land, greenness (NDVI) and land surface
+        temperature from MODIS Terra, each as an anomaly against 2001–2020 for the same month, from January 2024 to October
+        2026.
+      </p>
+      <div className="formula">dryness = mean(−topsoil moisture z, −root-zone moisture z, land heat z)</div>
+      <p>
+        Above 0.5 a place is drier than usual, above 1.5 much drier. Fuel risk multiplies the wildland fuel share by the
+        chance that a normal month is wetter than this one. At a fire, weather for the hour of the last satellite pass comes
+        from NASA POWER, or DWD ICON for the last few days.
+      </p>
+
       <h2>Data</h2>
       <ul>
         <li>NASA FIRMS country archives, MODIS Collection 6.1 and VIIRS S-NPP 375 m, 2000 to 2025</li>
@@ -93,6 +122,9 @@ export default function MethodPage() {
         <li>OpenStreetMap fire stations through the Overpass API</li>
         <li>GWIS burned area through Our World in Data, used to train the index model</li>
         <li>GeoNames cities500 for fire names</li>
+        <li>Regional firefighter estimates for 26 EU countries, 2025 (Slovenia 2010–2024, Ireland 2024)</li>
+        <li>CORINE Land Cover 2018, Copernicus DEM GLO-90, ERA5-Land soil moisture, MODIS NDVI and land surface temperature</li>
+        <li>NASA POWER and DWD ICON fire weather, GDACS live alerts</li>
         <li>Natural Earth 1:10m country shapes</li>
       </ul>
       <p className="small">
