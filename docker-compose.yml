@@ -1,0 +1,45 @@
+name: arecibo
+
+services:
+  frontend:
+    build: .
+    image: arecibo/frontend
+    ports:
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-8088}:80"
+    depends_on:
+      - amber-api
+      - firms-server
+      - context-api
+    restart: unless-stopped
+
+  amber-api:
+    build: ../data-science/amber-index
+    image: arecibo/amber-api
+    volumes:
+      - amber-data:/app/data
+    restart: unless-stopped
+
+  firms-server:
+    build:
+      context: ../data-science
+      dockerfile: Dockerfile.server
+    image: arecibo/firms-server
+    environment:
+      PIPELINE_SKIP: ${PIPELINE_SKIP:-fetch,sentinel2,terrain,weather,forecast}
+      FIRMS_SEED_YEARS: ${FIRMS_SEED_YEARS:-2024,2025}
+      FIRMS_EFFIS_FROM: ${FIRMS_EFFIS_FROM:-2024}
+    volumes:
+      - firms-data:/app/data
+    mem_limit: ${FIRMS_MEM_LIMIT:-6g}
+    restart: unless-stopped
+
+  context-api:
+    build: ../data-science/apis/context
+    image: arecibo/context-api
+    volumes:
+      - ${CONTEXT_DATA_DIR:-/var/lib/arecibo/context-data}:/app/data:ro
+    restart: unless-stopped
+
+volumes:
+  amber-data:
+  firms-data:
