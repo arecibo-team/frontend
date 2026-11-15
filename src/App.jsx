@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import EuropeMap from "./components/EuropeMap.jsx";
 import Segmented from "./components/Segmented.jsx";
 import Sidebar, { Dialog } from "./components/Sidebar.jsx";
-import Timeline from "./components/Timeline.jsx";
+import Timeline, { ForecastTimeline } from "./components/Timeline.jsx";
 import { Logo, Search } from "./components/Header.jsx";
 import Icon from "./components/Icon.jsx";
 import AreaPanel from "./panels/AreaPanel.jsx";
@@ -19,7 +19,7 @@ import { REGION_LABEL, WeightsPanel, contextMonth } from "./panels/Insights.jsx"
 import MethodPage from "./panels/Method.jsx";
 import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
-import { MONTHS, dec, longDate } from "./lib/format.js";
+import { MONTHS, dec, longDate, shortDay } from "./lib/format.js";
 import { ALL_NAMES, AMBER_COLORS, AMBER_STEPS, COUNTRY_NAMES, NEIGHBOUR_NAMES, POWER_COLORS, POWER_STEPS, classColor, fireRadius } from "./lib/geo.js";
 import { BOUNDS, CENTROIDS } from "./lib/plan.js";
 import { useFetch } from "./lib/useFetch.js";
@@ -318,7 +318,9 @@ export default function App() {
   const fcOpen = right === "fc";
   const [fcOpts, setFcOpts] = useState({ mode: "own", cells: true, real: true, alerts: false, skipWar: false });
   const [modelVersion, setModelVersion] = useState(0);
-  const fcView = ["real", "split"].includes(params.fv) ? params.fv : "model";
+  const fcView = ["real", "model"].includes(params.fv) ? params.fv : "split";
+  const fcRuns = useFetch(() => (fcOpen ? api.firms.modelRuns() : Promise.resolve(null)), [fcOpen]);
+  const fcRun = fcRuns.data?.runs?.find(r => r.id === fcRuns.data.active) || null;
   const meta = useFetch(() => (fcOpen ? api.firms.meta() : Promise.resolve(null)), [fcOpen]);
   const fcLast = useMemo(() => (meta.data?.days ? Object.keys(meta.data.days).sort().pop() : null) || "2026-11-15", [meta.data]);
   const fcMax = addDays(fcLast, FUTURE_DAYS);
@@ -566,7 +568,7 @@ export default function App() {
         <div className="stage">
           <div className="map-toolbar">
             {fcOpen ? (
-              <Segmented options={[["model", "Forecast"], ["real", "What happened"], ["split", "Side by side"]]} value={fcView} onChange={v => setParams({ fv: v === "model" ? undefined : v })} label="Forecast view" />
+              <Segmented options={[["split", "Side by side"], ["model", "Forecast"], ["real", "What happened"]]} value={fcView} onChange={v => setParams({ fv: v === "split" ? undefined : v })} label="Forecast view" />
             ) : s ? (
               <Segmented options={[["before", "Before"], ["after", "After"]]} value={simView} onChange={v => setParams({ view: v === "after" ? undefined : v })} label="Simulation view" />
             ) : p ? (
@@ -615,8 +617,8 @@ export default function App() {
           {replay.error && <p className="notice floating-notice">Could not load {longDate(replayDate)}: {replay.error.message}</p>}
           {fcOpen && fcView === "split" ? (
             <div className="split">
-              <EuropeMap fill={riskFill("model")} selected={null} onSelect={undefined} forecast={fcLayer(true, false)} sync="fc" title="Forecast" ariaLabel="Forecast map" />
-              <EuropeMap fill={riskFill("real")} selected={null} onSelect={undefined} forecast={fcLayer(false, true)} tiles={realTiles} sync="fc" title="What happened" ariaLabel="Map of what happened" />
+              <EuropeMap fill={riskFill("model")} selected={null} onSelect={undefined} forecast={fcLayer(true, false)} sync="fc" title={`Predicted on ${shortDay(fd)} for the next ${fcHorizon} days`} ariaLabel="Forecast map" />
+              <EuropeMap fill={riskFill("real")} selected={null} onSelect={undefined} forecast={fcLayer(false, true)} tiles={realTiles} sync="fc" title={realFrom <= fcLast ? `Confirmed by MODIS, VIIRS and European incidents, ${shortDay(realFrom)} – ${shortDay(realTo)}` : "Not in the data yet"} ariaLabel="Map of what happened" />
             </div>
           ) : fcOpen ? (
             <EuropeMap fill={fill} selected={null} onSelect={undefined} forecast={fcLayer(fcView === "model", true)} tiles={fcView === "real" ? realTiles : null} ariaLabel="Forecast map" />
@@ -729,7 +731,7 @@ export default function App() {
         )}
       </div>
 
-      <Timeline
+      {fcOpen ? <ForecastTimeline day={fd} min={FORECAST_FROM} max={fcMax} last={fcLast} run={fcRun} onDay={setFd} /> : <Timeline
         series={timeline.data?.series}
         loading={timeline.loading}
         from={from}
@@ -742,7 +744,7 @@ export default function App() {
         onYear={y => setParams({ ty: String(y) })}
         onRange={(a, b) => setRange(a, b, { right: right === "help" ? "help" : undefined, tab: "range" })}
         onDay={setDay}
-      />
+      />}
 
       <Busy show={busySim} title="Running the simulation" steps={["Adding the hazards to each country", "Recomputing the Amber index", "Committing crews and power", "Ranking the EU"]} />
       <Busy show={busyImport} title="Importing FIRMS data" steps={["Reading the CSV", "Sorting rows by satellite and product", "Starting the harmonization pipeline"]} />
