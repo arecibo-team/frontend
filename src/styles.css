@@ -35,10 +35,13 @@ ul, ol { list-style: none; }
 
 .header { display: flex; align-items: center; gap: 20px; padding: 0 16px; background: var(--paper); border-bottom: 1px solid var(--rule); min-width: 0; }
 .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; font-size: 15px; }
-.brand svg { display: block; }
+.brand-logo { display: block; height: 42px; width: auto; }
+.key-hatch { display: inline-block; width: 14px; height: 10px; margin-right: 6px; background: repeating-linear-gradient(45deg, #eef0f3 0 2px, #b9bec6 2px 3px); }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 4px; height: 100%; min-width: 0; }
 .day-picker { display: flex; align-items: center; }
 .date { height: 30px; border: 1px solid var(--rule-strong); border-radius: 6px; padding: 0 8px; background: var(--paper); font-variant-numeric: tabular-nums; }
+.range-picker { display: flex; align-items: center; gap: 6px; color: var(--ink-3, #6b7280); }
+.range-picker .date { width: 128px; }
 .day-picker .date { border-radius: 0; border-left: 0; border-right: 0; }
 .day-picker .icon-btn { border: 1px solid var(--rule-strong); border-radius: 6px 0 0 6px; height: 30px; width: 26px; }
 .day-picker .icon-btn:last-child { border-radius: 0 6px 6px 0; }
@@ -473,3 +476,42 @@ ul, ol { list-style: none; }
 .better { color: var(--good); font-weight: 500; }
 .worse { color: var(--ember-deep); }
 .flow-base, .flow-run { stroke-linejoin: round; }
+
+.split { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule-strong); min-width: 0; }
+.split .map-box { min-width: 0; }
+.map-title { position: absolute; z-index: 900; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 3px 10px; background: var(--paper); border: 1px solid var(--rule-strong); border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.key-cell { background: #e2702f; box-shadow: 0 0 0 1px #fff, 0 0 0 2px var(--rule-strong); }
+.key-ring { background: none; border: 2px solid #1c6fd6; width: 10px; height: 10px; }
+.key-bar { border-radius: 1px; background: var(--rule-strong); }
+.key-rule { border-radius: 0; height: 2px; width: 12px; background: var(--ember); vertical-align: 3px; }
+.key-band { border-radius: 1px; background: var(--ember-wash); box-shadow: inset 0 0 0 1px #f3cdb6; }
+.fc-day { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-top: 14px; font-size: 15px; line-height: 21px; font-weight: 500; }
+.fc-state { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--ink-2); }
+.fc-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; background: var(--ink-3); }
+.fc-state.fc-train::before { background: var(--water); }
+.fc-state.fc-event::before { background: var(--ember); }
+.fc-state.fc-test::before { background: var(--good); }
+.fc .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.fc .toggles .check:last-child { grid-column: 1 / -1; }
+.fc-countries td .key, .fc-countries th .key { margin-right: 6px; }
+.fc-verdict { margin-bottom: 8px; }
+.fc-verdict b { font-weight: 600; }
+.fc-verdict b.is-bad { color: var(--ember-deep); }
+.fc-chart { display: block; width: 100%; height: auto; margin: 4px 0; overflow: visible; }
+.fc-chart text { font-size: 9px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fc-bar { fill: var(--rule-strong); }
+.fc-spike { fill: var(--ember-wash); }
+.fc-axis { stroke: var(--rule); }
+.fc-line { fill: none; stroke: var(--ember); stroke-width: 1.6; stroke-linejoin: round; }
+.fc-line.fc-train { stroke: var(--water); }
+.fc-keys { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-bottom: 10px; }
+.fc-lead { margin-bottom: 8px; }
+.fc-model { border-bottom: 0; margin-top: -6px; }
+.fc-train { display: grid; gap: 10px; padding: 6px 0 10px; }
+.fc-train-actions { display: flex; gap: 8px; }
+.fc-train-actions > * { flex: 1; }
+.fc-rounds { padding: 0 8px; background-image: none; }
+.fc-progress { height: 3px; background: var(--canvas); margin: 2px 0 6px; }
+.fc-progress b { display: block; height: 100%; background: var(--ink); }
+.soil-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+.soil-pick { margin-top: 8px; }

@@ -56,7 +56,7 @@ export default function Timeline({ series, from, to, day, mode, year, onMode, on
           {label}
           <span className="small">
             {" "}
-            {drag ? `${unit === "day" ? shortDay(rf) : monthYear(rf)} – ${unit === "day" ? shortDay(rt) : monthYear(rt)}` : "drag to select, click to replay"}
+            {drag && unit !== "day" ? `${monthYear(rf)} – ${monthYear(rt)}` : `${shortDay(rf)} ${rf.slice(0, 4) === rt.slice(0, 4) ? "" : rf.slice(0, 4) + " "}– ${shortDay(rt)} ${rt.slice(0, 4)}`}
           </span>
         </span>
         <div className="timeline-tools">

@@ -31,6 +31,7 @@ services:
     environment:
       PIPELINE_SKIP: ${PIPELINE_SKIP:-fetch,sentinel2,terrain,weather,forecast}
       FIRMS_SEED_YEARS: ${FIRMS_SEED_YEARS:-2024,2025}
+      FIRMS_SNAPSHOT_URL: ${FIRMS_SNAPSHOT_URL:-}
       FIRMS_EFFIS_FROM: ${FIRMS_EFFIS_FROM:-2024}
     volumes:
       - firms-data:/app/data

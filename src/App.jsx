@@ -10,6 +10,8 @@ import CoordsForm from "./panels/CoordsForm.jsx";
 import FiresPanel from "./panels/FiresPanel.jsx";
 import SimPanel from "./panels/SimPanel.jsx";
 import DataPanel from "./panels/DataPanel.jsx";
+import ForecastPanel from "./panels/ForecastPanel.jsx";
+import { FORECAST_FROM, FUTURE_DAYS, WAR, riskByIso, riskGradient, riskColor, riskValue } from "./lib/forecast.js";
 import Busy, { useMinPending } from "./components/Busy.jsx";
 import { ALERT_COLOR, HAZARD_NAME, STORIES, decodeShocks, encodeShocks, toRequest } from "./lib/sim.js";
 import HelpPanel from "./panels/HelpPanel.jsx";
@@ -18,7 +20,7 @@ import MethodPage from "./panels/Method.jsx";
 import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
 import { MONTHS, dec, longDate } from "./lib/format.js";
-import { AMBER_COLORS, AMBER_STEPS, COUNTRY_NAMES, POWER_COLORS, POWER_STEPS, classColor, fireRadius } from "./lib/geo.js";
+import { ALL_NAMES, AMBER_COLORS, AMBER_STEPS, COUNTRY_NAMES, NEIGHBOUR_NAMES, POWER_COLORS, POWER_STEPS, classColor, fireRadius } from "./lib/geo.js";
 import { BOUNDS, CENTROIDS } from "./lib/plan.js";
 import { useFetch } from "./lib/useFetch.js";
 
@@ -46,6 +48,7 @@ function useParams() {
 
 const DRY_STEPS = [-1.5, -0.5, 0.5, 1.5];
 const DRY_COLORS = ["#2f62a8", "#9cbde0", "#efefea", "#f2b27c", "#c2410c"];
+const NEIGHBOUR_CODES = Object.keys(NEIGHBOUR_NAMES);
 const NEUTRAL = "#e7eaef";
 const SCALE_STOPS = [0, 20, 35, 50, 65, 100];
 const SCALE_COLORS = ["#b53a0a", "#e8834a", "#f1dcc4", "#bcd0e6", "#5f8cc0", "#1f456f"].map(h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)));
@@ -77,7 +80,20 @@ function liveShocks(events) {
     .slice(0, 12);
 }
 
-function MapLegend({ layer, help, title, bubbles = true, month }) {
+function MapLegend({ layer, help, title, bubbles = true, month, risk }) {
+  if (risk) {
+    return (
+      <div className="map-legend floating">
+        <div>
+          <div className="legend-title">{risk.mode === "own" ? "Country risk, own season" : "Fire cells per 1,000 km²"}</div>
+          <div className="ramp ramp-smooth" style={{ background: riskGradient }} />
+          <div className="ramp-ticks ramp-ends">{risk.mode === "own" ? <><span>low</span><span>very high</span></> : <><span>0.01</span><span>0.1</span><span>1</span></>}</div>
+        </div>
+        <span className="legend-item"><i className="key key-cell" />Model cell, solid over the alert level</span>
+        <span className="legend-item"><i className="key key-ring" />Confirmed fire</span>
+      </div>
+    );
+  }
   if (layer === "dryness") {
     return (
       <div className="map-legend floating">
@@ -113,6 +129,7 @@ function MapLegend({ layer, help, title, bubbles = true, month }) {
         <div className="ramp">{colors.map(c => <span key={c} style={{ background: c }} />)}</div>
         <div className="ramp-ticks">{steps.map(s => <span key={s}>{s}</span>)}</div>
       </div>
+      {layer !== "regions" && <span className="legend-item"><i className="key-hatch" />Fire record only</span>}
       {bubbles && <div>
         <div className="legend-title">Hotspots, 24 h</div>
         <div className="bubbles">
@@ -158,14 +175,14 @@ export default function App() {
   const showFires = params.fires !== "0";
   const filter = ["above", "watch"].includes(params.filter) ? params.filter : "all";
   const left = params.left !== "0";
-  const right = ["help", "sim", "data"].includes(params.right) ? params.right : params.right === "0" ? null : "area";
+  const right = ["help", "sim", "data", "fc"].includes(params.right) ? params.right : params.right === "0" ? null : "area";
   const mode = params.mode === "raw" ? "raw" : "harmonized";
   const [drawing, setDrawing] = useState(false);
   const [dialog, setDialog] = useState(null);
 
   const boxArr = params.box ? params.box.split(",").map(Number) : null;
   const box = boxArr && boxArr.length === 4 && boxArr.every(Number.isFinite) && boxArr[0] < boxArr[2] && boxArr[1] < boxArr[3] ? boxArr : null;
-  const iso2 = box ? null : params.c && COUNTRY_NAMES[params.c] ? params.c : "GR";
+  const iso2 = box ? null : params.c && ALL_NAMES[params.c] ? params.c : "GR";
   const to0 = clampDate(params.to || date);
   const asof = to0 > date ? to0 : date;
   const to = to0;
@@ -183,7 +200,7 @@ export default function App() {
   const timeline = useFetch(() => api.area({ country: iso2, box: query.box, from: tlStart, to: tlEnd, asof: tlEnd }), [iso2, query.box, tlStart, tlEnd]);
 
   const helpInitial = {
-    recipient: params.hc && COUNTRY_NAMES[params.hc] ? params.hc : iso2 || "GR",
+    recipient: params.hc && COUNTRY_NAMES[params.hc] ? params.hc : COUNTRY_NAMES[iso2] ? iso2 : "GR",
     load: [1, 1.5, 2].includes(Number(params.load)) ? Number(params.load) : 1,
     half: params.half !== "0",
     floor: params.floor === "1",
@@ -252,7 +269,7 @@ export default function App() {
   const busyPlan = useMinPending(Boolean(helpKey) && plan.loading, 1100);
 
   const detectionsOn = params.det === "1";
-  const [layers, setLayers] = useState({ modis: true, viirs: true, common: true, incidents: false });
+  const [layers, setLayers] = useState({ modis: true, viirs: true, common: true, incidents: false, soil: false, soilCls: null });
   const [dataVersion, setDataVersion] = useState(0);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -297,6 +314,31 @@ export default function App() {
   };
   const busyImport = useMinPending(importing, 1100);
 
+  const fcOpen = right === "fc";
+  const [fcOpts, setFcOpts] = useState({ mode: "own", cells: true, real: true, alerts: false, skipWar: false });
+  const [modelVersion, setModelVersion] = useState(0);
+  const fcView = ["real", "split"].includes(params.fv) ? params.fv : "model";
+  const meta = useFetch(() => (fcOpen ? api.firms.meta() : Promise.resolve(null)), [fcOpen]);
+  const fcLast = useMemo(() => (meta.data?.days ? Object.keys(meta.data.days).sort().pop() : null) || "2026-11-15", [meta.data]);
+  const fcMax = addDays(fcLast, FUTURE_DAYS);
+  const fd = !params.fd ? fcLast : params.fd < FORECAST_FROM ? FORECAST_FROM : params.fd > fcMax ? fcMax : params.fd;
+  const fcReady = fcOpen && (Boolean(params.fd) || !meta.loading);
+  const risk = useFetch(() => (fcReady ? api.firms.risk(fd) : Promise.resolve(null)), [fcReady, fd, modelVersion]);
+  const forecast = useFetch(() => (fcReady ? api.firms.forecast(fd) : Promise.resolve(null)), [fcReady, fd, modelVersion]);
+  const riskIso = useMemo(() => riskByIso(risk.data), [risk.data]);
+  const fcData = forecast.data && forecast.data.date === fd ? forecast.data : null;
+  const fcHorizon = fcData?.horizon ?? risk.data?.horizon ?? 3;
+  const realFrom = addDays(fd, 1);
+  const realTo = addDays(fd, fcHorizon) > fcLast ? fcLast : addDays(fd, fcHorizon);
+  const realTiles = fcOpen && realFrom <= fcLast ? api.firms.tileUrl(realFrom, realTo, 4, meta.data?.generated_utc || "0") : null;
+  const riskFill = source => code => {
+    const c = riskIso[code];
+    if (!c || (fcOpts.skipWar && WAR.has(c.name))) return "#dfe3e8";
+    const v = riskValue(c, fcOpts.mode, source);
+    return v == null ? "#dfe3e8" : riskColor(v);
+  };
+  const fcLayer = (model, real) => (fcData ? { data: fcData, model: model && fcOpts.cells, real: real && fcOpts.real, alerts: fcOpts.alerts } : null);
+
   const ctxMonth = contextMonth(replayDate);
   const mapLayer = layer === "dryness" && !ctxMonth ? "power" : layer;
   const needRegions = mapLayer === "regions" || (right === "area" && !box);
@@ -332,6 +374,7 @@ export default function App() {
   });
   const after = phase === "after";
   const fill = code => {
+    if (fcOpen) return riskFill(fcView === "real" ? "real" : "model")(code);
     if (simRows) {
       const r = simRows[code];
       if (!r) return "#dfe3e8";
@@ -359,8 +402,21 @@ export default function App() {
   };
   const setDay = d => {
     const day = clampReplay(d);
-    setParams({ date: day, fire: undefined, ty: undefined, to: params.to && params.to > day ? day : params.to });
+    const inside = params.from && params.to && day >= params.from && day <= params.to;
+    setParams({ date: day, fire: undefined, ty: undefined, from: inside ? params.from : undefined, to: inside ? params.to : undefined });
   };
+  const setRange = (a, b, extra = {}) => {
+    const lo = clampDate(a <= b ? a : b);
+    const hi = clampDate(a <= b ? b : a);
+    const day = replayDate >= lo && replayDate <= hi ? replayDate : clampReplay(hi);
+    setParams({ from: lo, to: hi, date: day, ty: undefined, fire: day === replayDate ? params.fire : undefined, ...extra });
+  };
+
+  const setFd = d => setParams({ fd: d < FORECAST_FROM ? FORECAST_FROM : d > fcMax ? fcMax : d });
+  const pickerDay = fcOpen ? fd : replayDate;
+  const pickerMin = fcOpen ? FORECAST_FROM : REPLAY_FROM;
+  const pickerMax = fcOpen ? fcMax : DATA_TO;
+  const pickDay = fcOpen ? setFd : setDay;
 
   useEffect(() => {
     const onKey = e => e.key === "Escape" && setDrawing(false);
@@ -428,7 +484,7 @@ export default function App() {
       ? { key: `dry-${dryGrid.data.month}`, res: dryGrid.data.res_deg, data: dryGrid.data.cells, color: v => classColor(v, DRY_STEPS, DRY_COLORS), opacity: 0.8 }
       : null;
 
-  const areaTitle = box ? "Custom area" : COUNTRY_NAMES[iso2];
+  const areaTitle = box ? "Custom area" : ALL_NAMES[iso2];
   const areaSub = box
     ? `${box[1].toFixed(2)}–${box[3].toFixed(2)}°N, ${box[0].toFixed(2)}–${box[2].toFixed(2)}°E`
     : null;
@@ -438,14 +494,22 @@ export default function App() {
       <header className="header">
         <a className="brand" href="#/">
           <Logo />
-          Arecibo
         </a>
         <div className="day-picker">
-          <button className="icon-btn" type="button" aria-label="Previous day" onClick={() => setDay(addDays(replayDate, -1))} disabled={replayDate <= REPLAY_FROM}>‹</button>
-          <input type="date" className="date" min={REPLAY_FROM} max={DATA_TO} value={replayDate} aria-label="Replay day"
-            onChange={e => e.target.value && setDay(e.target.value)} />
-          <button className="icon-btn" type="button" aria-label="Next day" onClick={() => setDay(addDays(replayDate, 1))} disabled={replayDate >= DATA_TO}>›</button>
+          <button className="icon-btn" type="button" aria-label="Previous day" onClick={() => pickDay(addDays(pickerDay, -1))} disabled={pickerDay <= pickerMin}>‹</button>
+          <input type="date" className="date" min={pickerMin} max={pickerMax} value={pickerDay} aria-label={fcOpen ? "Forecast day" : "Replay day"}
+            onChange={e => e.target.value && pickDay(e.target.value)} />
+          <button className="icon-btn" type="button" aria-label="Next day" onClick={() => pickDay(addDays(pickerDay, 1))} disabled={pickerDay >= pickerMax}>›</button>
         </div>
+        {!fcOpen && (
+          <div className="range-picker">
+            <input type="date" className="date" min="2001-01-01" max={DATA_TO} value={from} aria-label="Interval start"
+              onChange={e => e.target.value && setRange(e.target.value, e.target.value > to ? e.target.value : to)} />
+            <span aria-hidden="true">–</span>
+            <input type="date" className="date" min="2001-01-01" max={DATA_TO} value={to} aria-label="Interval end"
+              onChange={e => e.target.value && setRange(e.target.value < from ? e.target.value : from, e.target.value)} />
+          </div>
+        )}
         <div className="header-right">
           <nav className="panel-nav" aria-label="Panels">
             <button className={left ? "on" : ""} type="button" aria-pressed={left} onClick={() => setParams({ left: left ? "0" : undefined })}>
@@ -465,6 +529,10 @@ export default function App() {
               <Icon name="help" />
               Who can help
             </button>
+            <button className={fcOpen ? "on" : ""} type="button" aria-pressed={fcOpen} onClick={() => setParams({ right: fcOpen ? undefined : "fc" })}>
+              <Icon name="trend" />
+              Forecast
+            </button>
             <button className={right === "data" ? "on" : ""} type="button" aria-pressed={right === "data"} onClick={() => setParams({ right: right === "data" ? undefined : "data" })}>
               <Icon name="data" />
               Data
@@ -481,7 +549,7 @@ export default function App() {
 
       <div className="ws-body">
         {left && (
-          <Sidebar side="left" title="Active fires" sub={rd ? `${rd.counts.all} in the EU` : null} onClose={() => setParams({ left: "0" })}>
+          <Sidebar side="left" title="Active fires" sub={rd ? `${rd.counts.all} in Europe` : null} onClose={() => setParams({ left: "0" })}>
             {() => (
               <FiresPanel
                 data={rd}
@@ -496,7 +564,9 @@ export default function App() {
 
         <div className="stage">
           <div className="map-toolbar">
-            {s ? (
+            {fcOpen ? (
+              <Segmented options={[["model", "Forecast"], ["real", "What happened"], ["split", "Side by side"]]} value={fcView} onChange={v => setParams({ fv: v === "model" ? undefined : v })} label="Forecast view" />
+            ) : s ? (
               <Segmented options={[["before", "Before"], ["after", "After"]]} value={simView} onChange={v => setParams({ view: v === "after" ? undefined : v })} label="Simulation view" />
             ) : p ? (
               <>
@@ -519,12 +589,13 @@ export default function App() {
                 label="Map layer"
               />
             ) : null}
-            {!s && !p && (
+            {!s && !p && !fcOpen && (
               <label className="check check-ink">
                 <input type="checkbox" checked={showFires} onChange={e => setParams({ fires: e.target.checked ? undefined : "0" })} />
                 Fires
               </label>
             )}
+            {!fcOpen && <>
             <button className={`tool${detectionsOn ? " on-soft" : ""}`} type="button" aria-pressed={detectionsOn} aria-label="Detections" title="MODIS and VIIRS detections" onClick={() => setParams({ det: detectionsOn ? undefined : "1" })}>
               <Icon name="layers" />
               <span className="tool-label">Detections</span>
@@ -538,8 +609,17 @@ export default function App() {
               <Icon name="target" />
               <span className="tool-label">Coordinates</span>
             </button>
+            </>}
           </div>
           {replay.error && <p className="notice floating-notice">Could not load {longDate(replayDate)}: {replay.error.message}</p>}
+          {fcOpen && fcView === "split" ? (
+            <div className="split">
+              <EuropeMap fill={riskFill("model")} selected={null} onSelect={undefined} forecast={fcLayer(true, false)} sync="fc" title="Forecast" ariaLabel="Forecast map" />
+              <EuropeMap fill={riskFill("real")} selected={null} onSelect={undefined} forecast={fcLayer(false, true)} tiles={realTiles} sync="fc" title="What happened" ariaLabel="Map of what happened" />
+            </div>
+          ) : fcOpen ? (
+            <EuropeMap fill={fill} selected={null} onSelect={undefined} forecast={fcLayer(fcView === "model", true)} tiles={fcView === "real" ? realTiles : null} ariaLabel="Forecast map" />
+          ) : (
           <EuropeMap
             fill={fill}
             selected={s ? null : p ? p.recipient : iso2}
@@ -550,8 +630,9 @@ export default function App() {
             slowFade={Boolean(p)}
             cells={cells}
             tiles={tileUrl}
+            soil={detectionsOn && layers.soil ? api.firms.soilUrl(layers.soilCls) : null}
             incidents={incidentsOn && incidentData.data ? { key: `${from}-${to}-${dataVersion}-${incidentData.data.features.length}`, data: incidentData.data } : null}
-            hatch={[]}
+            hatch={!s && !p && !fcOpen && (mapLayer === "power" || mapLayer === "amber") ? NEIGHBOUR_CODES : []}
             onSelect={drawing ? undefined : selectCountry}
             fires={showFires && !p && !s ? fires : []}
             callout={showFires && !p && !s && calloutFire ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)}× the ${month} median` } : null}
@@ -561,9 +642,10 @@ export default function App() {
             drawing={drawing}
             onDraw={setBox}
             box={box}
-            ariaLabel="Map of the EU"
+            ariaLabel="Map of Europe"
           />
-          <MapLegend layer={s ? "power" : mapLayer} help={Boolean(p)} title={s ? `Power, ${simView}` : null} bubbles={showFires && !s && mapLayer !== "dryness"} month={dryGrid.data?.month ? new Date(`${dryGrid.data.month}-01`).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null} />
+          )}
+          <MapLegend risk={fcOpen ? fcOpts : null} layer={s ? "power" : mapLayer} help={Boolean(p)} title={s ? `Power, ${simView}` : null} bubbles={showFires && !s && mapLayer !== "dryness"} month={dryGrid.data?.month ? new Date(`${dryGrid.data.month}-01`).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null} />
         </div>
 
         {right === "area" && (
@@ -631,6 +713,14 @@ export default function App() {
             )}
           </Sidebar>
         )}
+        {fcOpen && (
+          <Sidebar side="right" title="Forecast" sub="Fires seen by both sensors" onClose={() => setParams({ right: undefined })} width={400}>
+            {() => (
+              <ForecastPanel day={fd} last={fcLast} setDay={setFd} risk={risk} forecast={{ ...forecast, data: fcData, loading: forecast.loading || !fcReady }} opts={fcOpts} setOpts={setFcOpts}
+                modelVersion={modelVersion} onModelChanged={() => setModelVersion(v => v + 1)} />
+            )}
+          </Sidebar>
+        )}
         {right === "help" && (
           <Sidebar side="right" title="Who can help" sub={`Fires on ${longDate(replayDate)}`} onClose={() => setParams({ right: undefined })} width={400}>
             {wide => <HelpPanel form={form} setForm={setForm} onRun={runPlan} plan={plan.data} error={plan.error} loading={plan.loading} wide={wide} />}
@@ -649,7 +739,7 @@ export default function App() {
         label={`${areaTitle}, fire cell-days`}
         onMode={m => setParams({ tl: m === "year" ? undefined : m })}
         onYear={y => setParams({ ty: String(y) })}
-        onRange={(a, b) => setParams({ from: a, to: b, right: right === "help" ? "help" : undefined, tab: "range" })}
+        onRange={(a, b) => setRange(a, b, { right: right === "help" ? "help" : undefined, tab: "range" })}
         onDay={setDay}
       />
 
