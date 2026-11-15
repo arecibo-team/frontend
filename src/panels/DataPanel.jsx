@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { num } from "../lib/format.js";
 import { Pending, Section } from "./Insights.jsx";
@@ -7,6 +7,32 @@ const STATUS_LABEL = { both: "Both sensors", modis_only: "MODIS only", viirs_onl
 const STATUS_COLOR = { both: "#c92a2a", modis_only: "#e8590c", viirs_only: "#1c7ed6" };
 const PLATFORM_COLOR = { "MODIS Terra": "#f08c00", "MODIS Aqua": "#e8590c", "VIIRS SNPP": "#1c7ed6", "VIIRS NOAA-20": "#4dabf7", "VIIRS NOAA-21": "#a5d8ff" };
 const LAYERS = [["modis", "MODIS", "#e8590c"], ["viirs", "VIIRS", "#1c7ed6"], ["common", "Confirmed", "#c92a2a"]];
+
+const SOIL_LABEL = {
+  sand: "Sand, beaches, dunes", rock: "Bare rock", sparse: "Sparse vegetation", burnt: "Burnt areas", glacier: "Glaciers, snow",
+  intertidal: "Intertidal flats", quarry: "Quarries, gravel pits", dump: "Dump sites", construction: "Construction sites"
+};
+
+function SoilClasses({ value, onChange }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    api.firms.soilClasses().then(setInfo).catch(() => undefined);
+  }, []);
+  if (!info) return null;
+  return (
+    <>
+      <select className="select select-sm soil-pick" aria-label="Bare ground class" value={value ?? ""} onChange={e => onChange(e.target.value === "" ? null : Number(e.target.value))}>
+        <option value="">All bare ground classes</option>
+        {info.classes.map((c, i) => <option key={c} value={i}>{SOIL_LABEL[c] || c}</option>)}
+      </select>
+      <div className="soil-legend">
+        {info.classes.map((c, i) => (
+          <span key={c}><i className="key" style={{ background: `rgb(${info.colors[i].join(",")})` }} />{SOIL_LABEL[c] || c}</span>
+        ))}
+      </div>
+    </>
+  );
+}
 
 function Split({ items, total, colors, labels = {} }) {
   return (
@@ -71,7 +97,13 @@ export default function DataPanel({ summary, sources, pipeline, modelRuns, query
             <i className="key key-line" />
             Incidents
           </label>
+          <label className="check">
+            <input type="checkbox" checked={Boolean(layers.soil)} onChange={e => setLayers({ ...layers, soil: e.target.checked })} />
+            <i className="key" style={{ background: "#b08d57" }} />
+            Bare ground
+          </label>
         </div>
+        {layers.soil && <SoilClasses value={layers.soilCls ?? null} onChange={v => setLayers({ ...layers, soilCls: v })} />}
       </Section>
 
       {summary.error && <p className="notice">{summary.error.message}</p>}

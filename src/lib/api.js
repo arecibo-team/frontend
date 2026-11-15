@@ -62,6 +62,39 @@ export const api = {
   firms: {
     weather: (lat, lon, time) => request(`/api/weather?lat=${lat}&lon=${lon}&time=${encodeURIComponent(time)}`, {}, FIRMS_URL),
     modelRuns: () => request("/api/model/runs", {}, FIRMS_URL),
+    risk: async date => {
+      const res = await fetch(`${FIRMS_URL}/api/risk?date=${date}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Risk failed (${res.status})`);
+      return res.json();
+    },
+    meta: () => request("/api/meta", {}, FIRMS_URL),
+    soilUrl: (cls = null) => `${FIRMS_URL}/api/soil/tiles/{z}/{x}/{y}.png${cls == null ? "" : `?cls=${cls}`}`,
+    soilClasses: () => request("/api/soil/classes", {}, FIRMS_URL),
+    modelRun: id => request(`/api/model/runs/${id}`, {}, FIRMS_URL),
+    streamUrl: () => `${FIRMS_URL}/api/model/stream`,
+    train: (rounds, horizon) => request("/api/model/train", { method: "POST", body: JSON.stringify({ rounds, horizon }) }, FIRMS_URL),
+    stopTraining: () => request("/api/model/stop", { method: "POST" }, FIRMS_URL),
+    resumeTraining: id => request(`/api/model/resume/${id}`, { method: "POST" }, FIRMS_URL),
+    forecast: async date => {
+      const res = await fetch(`${FIRMS_URL}/api/forecast?date=${date}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Forecast failed (${res.status})`);
+      const buf = await res.arrayBuffer();
+      const hl = new DataView(buf).getUint32(0, true);
+      const head = JSON.parse(new TextDecoder().decode(buf.slice(4, 4 + hl)));
+      let off = 4 + hl;
+      const f32 = () => {
+        const a = new Float32Array(buf.slice(off, off + 4 * head.n));
+        off += 4 * head.n;
+        return a;
+      };
+      const lat = f32();
+      const lon = f32();
+      const p = f32();
+      const actual = new Uint8Array(buf.slice(off, off + head.n));
+      return { ...head, lat, lon, p, actual };
+    },
     summary: q => request(`/api/summary?${firmsQuery(q)}`, {}, FIRMS_URL),
     sources: () => request("/api/sources", {}, FIRMS_URL),
     pipeline: () => request("/api/pipeline", {}, FIRMS_URL),

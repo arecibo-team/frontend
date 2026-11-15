@@ -3,6 +3,7 @@ import { CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, Rectangle,
 import L from "leaflet";
 import { BASEMAPS, EUROPE_BOUNDS, FLY_DURATION, HOME_BOUNDS, MAX_ZOOM, basemapHasOwnLabels } from "../config.js";
 import { fireRadius } from "../lib/geo.js";
+import { REAL_RING, pctText, probColor, probT } from "../lib/forecast.js";
 import MinZoomLock from "./MinZoomLock.jsx";
 import Basemap from "./Basemap.jsx";
 import CountriesLayer from "./CountriesLayer.jsx";
@@ -142,6 +143,90 @@ function CellLayer({ cells }) {
   return null;
 }
 
+const CELL_M = 5500;
+
+function cellRadius(zoom, lat) {
+  const mPerPx = (156543.03 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
+  return Math.min(40, Math.max(3.5, CELL_M / mPerPx));
+}
+
+function ForecastLayer({ forecast }) {
+  const map = useMap();
+  const { data: f, model, real, alerts } = forecast;
+  useEffect(() => {
+    if (!f) return undefined;
+    if (!map.getPane("forecast")) map.createPane("forecast").style.zIndex = 470;
+    const renderer = L.canvas({ pane: "forecast", padding: 0.2 });
+    const zoom = map.getZoom();
+    const marks = [];
+    const group = L.layerGroup();
+    if (model) {
+      Array.from({ length: f.p.length }, (_, i) => i)
+        .filter(i => !alerts || f.p[i] >= f.threshold)
+        .sort((a, b) => f.p[a] - f.p[b])
+        .forEach(i => {
+          const p = f.p[i];
+          const alert = p >= f.threshold;
+          const m = L.circleMarker([f.lat[i], f.lon[i]], {
+            renderer, radius: cellRadius(zoom, f.lat[i]), stroke: alert, color: "#ffffff", weight: 1.2,
+            fillColor: probColor(p), fillOpacity: alert ? 0.95 : 0.2 + 0.5 * probT(p)
+          });
+          const then = f.actual[i] ? "a confirmed fire followed" : f.complete ? "no confirmed fire followed" : "outcome not known yet";
+          m.bindTooltip(`<b>${pctText(p)}</b>${alert ? " alert" : ""}<br>${then}`, { sticky: true, className: "region-tip" });
+          marks.push([i, m, 0]);
+          m.addTo(group);
+        });
+    }
+    if (real) {
+      for (let i = 0; i < f.p.length; i++) {
+        if (!f.actual[i]) continue;
+        const m = L.circleMarker([f.lat[i], f.lon[i]], { renderer, radius: cellRadius(zoom, f.lat[i]) + 2.5, color: REAL_RING, weight: 1.5, fill: false });
+        m.bindTooltip(`<b>Confirmed fire</b><br>Model had ${pctText(f.p[i])}, ${f.p[i] >= f.threshold ? "a hit" : "a miss"}`, { sticky: true, className: "region-tip" });
+        marks.push([i, m, 2.5]);
+        m.addTo(group);
+      }
+    }
+    const resize = () => {
+      const z = map.getZoom();
+      marks.forEach(([i, m, extra]) => m.setRadius(cellRadius(z, f.lat[i]) + extra));
+    };
+    map.on("zoomend", resize);
+    group.addTo(map);
+    return () => {
+      map.off("zoomend", resize);
+      group.remove();
+      renderer.remove();
+    };
+  }, [map, f, model, real, alerts]);
+  return null;
+}
+
+const syncGroups = new Map();
+let syncing = false;
+
+function MapSync({ group }) {
+  const map = useMap();
+  useEffect(() => {
+    const set = syncGroups.get(group) || new Set();
+    syncGroups.set(group, set);
+    const other = [...set][0];
+    if (other) map.setView(other.getCenter(), other.getZoom(), { animate: false });
+    set.add(map);
+    const onMove = () => {
+      if (syncing) return;
+      syncing = true;
+      set.forEach(m => m !== map && m.setView(map.getCenter(), map.getZoom(), { animate: false }));
+      syncing = false;
+    };
+    map.on("move", onMove);
+    return () => {
+      map.off("move", onMove);
+      set.delete(map);
+    };
+  }, [map, group]);
+  return null;
+}
+
 function FitTo({ points }) {
   const map = useMap();
   const key = JSON.stringify(points);
@@ -218,6 +303,10 @@ export default function EuropeMap({
   cells,
   flows = [],
   slowFade = false,
+  soil,
+  forecast,
+  sync,
+  title,
   ariaLabel = "Map of the EU"
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -240,6 +329,7 @@ export default function EuropeMap({
   return (
     <div className={`map-box${tone}${drawing ? " drawing" : ""}${slowFade ? " slow-fade" : ""}`} role="region" aria-label={ariaLabel}>
       {drawing && <div className="draw-hint">Drag on the map to draw your area</div>}
+      {title && <div className="map-title">{title}</div>}
       <MapContainer
         className="map"
         bounds={HOME_BOUNDS}
@@ -259,7 +349,8 @@ export default function EuropeMap({
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomright" imperial={false} />
         <MinZoomLock />
-        <KeepHomeView enabled={!focus} />
+        <KeepHomeView enabled={!focus && !sync} />
+        {sync && <MapSync group={sync} />}
         <Basemap basemap={prefs.basemap} />
         <HatchPattern />
         <CountriesLayer
@@ -293,6 +384,12 @@ export default function EuropeMap({
           </Pane>
         )}
         {cells && <CellLayer cells={cells} />}
+        {forecast && <ForecastLayer forecast={forecast} />}
+        {soil && (
+          <Pane name="soil" style={{ zIndex: 445, pointerEvents: "none" }}>
+            <TileLayer key={soil} url={soil} opacity={0.85} maxZoom={MAX_ZOOM} maxNativeZoom={12} />
+          </Pane>
+        )}
         {tiles && (
           <Pane name="detections" style={{ zIndex: 450, pointerEvents: "none" }}>
             <TileLayer key={tiles} url={tiles} opacity={0.95} maxZoom={MAX_ZOOM} maxNativeZoom={12} />
