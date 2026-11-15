@@ -11,6 +11,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": { target: firms, changeOrigin: true },
+      "/science": { target: firms, changeOrigin: true, rewrite: path => path.replace(/^\/science/, "") || "/" },
       "/context": { target: context, changeOrigin: true, rewrite: path => path.replace(/^\/context/, "") }
     }
   }
