@@ -32,8 +32,10 @@ One screen built around the EU map.
   day, CSV exports of the harmonized detections (both sensors, MODIS only, VIIRS only), a drop zone to import any FIRMS
   CSV, and the pipeline steps. **Detections** on the map toolbar shows the heat tiles (MODIS, VIIRS, confirmed) and the
   independent incident polygons for the selected dates.
-- **Who can help** sidebar: pick a scenario and rules, and the plan draws donor routes on the map. Simulations and plans
-  lock the screen until the result is in.
+- **Who can help** sidebar: a plan for the fires detected on the replay day. Each region answers its own fires, the
+  country's other regions send their spare crews, and only what is still missing comes from abroad. Running a plan locks
+  the screen, then plays on the map: the receiving country is shown by region, need labels turn to covered, flows move
+  from each sender, and colours fade from power before to power with help. Replay and Before / With help repeat it.
 
 Every sidebar opens in a large dialog, and Method explains the harmonization, the index and the plan. The state lives in
 the URL, so a link opens the same area, dates and panels.

@@ -19,7 +19,7 @@ import { api } from "./lib/api.js";
 import { DATA_TO, DEFAULT_DATE, REPLAY_FROM, addDays, clampDate, clampReplay, iso } from "./lib/dates.js";
 import { MONTHS, dec, longDate } from "./lib/format.js";
 import { AMBER_COLORS, AMBER_STEPS, COUNTRY_NAMES, POWER_COLORS, POWER_STEPS, classColor, fireRadius } from "./lib/geo.js";
-import { BOUNDS, CENTROIDS, SCENARIOS, routesFor } from "./lib/plan.js";
+import { BOUNDS, CENTROIDS } from "./lib/plan.js";
 import { useFetch } from "./lib/useFetch.js";
 
 function readHash() {
@@ -47,6 +47,17 @@ function useParams() {
 const DRY_STEPS = [-1.5, -0.5, 0.5, 1.5];
 const DRY_COLORS = ["#2f62a8", "#9cbde0", "#efefea", "#f2b27c", "#c2410c"];
 const NEUTRAL = "#e7eaef";
+const SCALE_STOPS = [0, 20, 35, 50, 65, 100];
+const SCALE_COLORS = ["#b53a0a", "#e8834a", "#f1dcc4", "#bcd0e6", "#5f8cc0", "#1f456f"].map(h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)));
+
+function powerColor(v) {
+  const x = Math.max(0, Math.min(100, v));
+  let i = 0;
+  while (i < SCALE_STOPS.length - 2 && x > SCALE_STOPS[i + 1]) i++;
+  const t = (x - SCALE_STOPS[i]) / (SCALE_STOPS[i + 1] - SCALE_STOPS[i]);
+  const c = SCALE_COLORS[i].map((a, k) => Math.round(a + (SCALE_COLORS[i + 1][k] - a) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 const REGION_STEPS = [20, 35, 50, 65];
 const REGION_COLORS = ["#c2410c", "#f2a46b", "#ebe6dc", "#8faed4", "#244f80"];
 
@@ -82,9 +93,13 @@ function MapLegend({ layer, help, title, bubbles = true, month }) {
   if (help) {
     return (
       <div className="map-legend floating">
-        <span className="legend-item"><i className="key-route" />Route, thicker is sooner</span>
-        <span className="legend-item"><i className="key-sends" />Sends help</span>
-        <span className="legend-item"><i className="key-left" />Left out</span>
+        <div>
+          <div className="legend-title">Power</div>
+          <div className="ramp ramp-smooth" style={{ background: `linear-gradient(90deg, ${[0, 20, 35, 50, 65, 100].map(v => `${powerColor(v)} ${v}%`).join(", ")})` }} />
+          <div className="ramp-ticks ramp-ends"><span>0</span><span>50</span><span>100</span></div>
+        </div>
+        <span className="legend-item"><i className="key-flow" />From abroad</span>
+        <span className="legend-item"><i className="key-flow national" />Within the country</span>
       </div>
     );
   }
@@ -169,36 +184,53 @@ export default function App() {
 
   const helpInitial = {
     recipient: params.hc && COUNTRY_NAMES[params.hc] ? params.hc : iso2 || "GR",
-    scenario: SCENARIOS.some(([id]) => id === params.s) ? params.s : "wildfire_season",
-    floor: params.floor !== "0",
-    skip: params.skip !== "0",
+    load: [1, 1.5, 2].includes(Number(params.load)) ? Number(params.load) : 1,
+    half: params.half !== "0",
+    floor: params.floor === "1",
     fastest: params.fast !== "0"
   };
   const [form, setForm] = useState(helpInitial);
   useEffect(() => setForm(f => ({ ...f, recipient: helpInitial.recipient })), [helpInitial.recipient]);
-  const helpKey = right === "help" ? JSON.stringify(helpInitial) + replayDate : null;
+  const [planNonce, setPlanNonce] = useState(0);
+  const helpKey = right === "help" ? `${JSON.stringify(helpInitial)}|${replayDate}|${planNonce}` : null;
   const plan = useFetch(
     () =>
       helpKey
         ? api.plan({
             recipient: helpInitial.recipient,
             date: replayDate,
-            scenario: helpInitial.scenario,
+            load: helpInitial.load,
+            keep_half: helpInitial.half,
             min_power_after: helpInitial.floor ? 50 : null,
-            skip_active_fires: helpInitial.skip,
             fastest_first: helpInitial.fastest
           })
         : Promise.resolve(null),
     [helpKey]
   );
-  const runPlan = () =>
+  const runPlan = () => {
+    setPlanNonce(n => n + 1);
     setParams({
       hc: form.recipient,
-      s: form.scenario === "wildfire_season" ? undefined : form.scenario,
-      floor: form.floor ? undefined : "0",
-      skip: form.skip ? undefined : "0",
+      load: form.load === 1 ? undefined : String(form.load),
+      half: form.half ? undefined : "0",
+      floor: form.floor ? "1" : undefined,
       fast: form.fastest ? undefined : "0"
     });
+  };
+  const [phase, setPhase] = useState("after");
+  const [flowRun, setFlowRun] = useState(0);
+  const playPlan = () => {
+    setPhase("before");
+    setFlowRun(n => n + 1);
+  };
+  useEffect(() => {
+    if (plan.data && right === "help") playPlan();
+  }, [plan.data, right]);
+  useEffect(() => {
+    if (phase !== "before") return undefined;
+    const t = setTimeout(() => setPhase("after"), 1600);
+    return () => clearTimeout(t);
+  }, [phase, flowRun]);
 
   const [draft, setDraft] = useState(() => {
     const d = decodeShocks(params.sim);
@@ -271,8 +303,8 @@ export default function App() {
   const regionsData = useFetch(() => (needRegions ? api.regions(replayDate) : Promise.resolve(null)), [needRegions, replayDate]);
   const [regionGeo, setRegionGeo] = useState(null);
   useEffect(() => {
-    if (mapLayer === "regions" && !regionGeo) import("./data/eu-regions.json").then(m => setRegionGeo(m.default));
-  }, [mapLayer]);
+    if ((mapLayer === "regions" || right === "help") && !regionGeo) import("./data/eu-regions.json").then(m => setRegionGeo(m.default));
+  }, [mapLayer, right]);
   const dryGrid = useFetch(() => (mapLayer === "dryness" ? api.context.grid("dryness", ctxMonth) : Promise.resolve(null)), [mapLayer, ctxMonth]);
   const live = useFetch(() => (right === "sim" ? api.live() : Promise.resolve(null)), [right === "sim"]);
   const liveStory = useMemo(() => liveShocks(live.data?.events), [live.data]);
@@ -298,7 +330,7 @@ export default function App() {
     const row = (perCountry[x.iso2] = (perCountry[x.iso2] || 0) + 1) - 1;
     badges.push({ key: `${x.iso2}-${row}`, lat: at[0], lon: at[1], row, color: ALERT_COLOR[x.alert], label: `${HAZARD_NAME[x.type]}${x.count > 1 ? ` ×${x.count}` : ""}` });
   });
-  const donors = p ? Object.fromEntries(p.donors.map(d => [d.iso2, d])) : {};
+  const after = phase === "after";
   const fill = code => {
     if (simRows) {
       const r = simRows[code];
@@ -306,9 +338,9 @@ export default function App() {
       return classColor(simView === "before" ? r.power_before : r.power_after, POWER_STEPS, POWER_COLORS);
     }
     if (p) {
-      if (donors[code]) return classColor(donors[code].power_before, POWER_STEPS, POWER_COLORS);
-      if (code === p.recipient.iso2) return classColor(p.recipient.power_with_help, POWER_STEPS, POWER_COLORS);
-      return "#e4e8ee";
+      if (code === p.recipient) return NEUTRAL;
+      const pw = p.powers[code];
+      return pw ? powerColor(pw[after ? 1 : 0]) : "#dfe3e8";
     }
     if (mapLayer === "regions" || mapLayer === "dryness") return NEUTRAL;
     const c = byIso[code];
@@ -338,6 +370,37 @@ export default function App() {
 
   const regionRows = useMemo(() => Object.fromEntries((regionsData.data?.regions || []).map(r => [`${r.iso2}-${r.region}`, r])), [regionsData.data]);
   const focusRegion = selectedFire?.region || (iso2 ? fires.filter(f => f.iso2 === iso2).sort((a, b) => b.detections - a.detections)[0]?.region : null);
+  const planRegions = useMemo(() => (p ? Object.fromEntries(p.regions.map(g => [g.region, g])) : {}), [p]);
+  const planShapes = useMemo(
+    () => (p && regionGeo ? { type: "FeatureCollection", features: regionGeo.features.filter(f => f.properties.iso2 === p.recipient) } : null),
+    [p?.recipient, regionGeo]
+  );
+  const helpShapes =
+    p && planShapes
+      ? {
+          key: `plan-${p.recipient}`,
+          restyle: `${phase}-${flowRun}`,
+          data: planShapes,
+          style: f => {
+            const g = planRegions[f.properties.region];
+            return { color: "#ffffff", weight: 1.2, fillOpacity: 0.95, fillColor: g ? powerColor(after ? g.power_after : g.power_before) : NEUTRAL };
+          },
+          tooltip: f => {
+            const g = planRegions[f.properties.region];
+            if (!g) return "";
+            return `<b>${REGION_LABEL[g.region]} ${p.name}</b><br>Fires need ${g.need.toLocaleString("en-GB")}, local crews ${g.local.toLocaleString("en-GB")}<br>Power ${Math.round(g.power_before)} before, ${Math.round(g.power_after)} after`;
+          }
+        }
+      : null;
+  const flows = p && after
+    ? p.moves.map((m, i) => ({ key: `${flowRun}-${i}`, from: m.from_point, to: m.to_point, kind: m.kind, n: m.firefighters, order: i }))
+    : [];
+  const planBadges = p
+    ? [
+        ...p.regions.filter(g => g.need > 0).map(g => ({ key: `need-${g.region}`, lat: g.front[0], lon: g.front[1], row: 0, color: after && !g.uncovered ? "#2f7d4f" : "#c2410c", label: after && !g.uncovered ? `${g.need.toLocaleString("en-GB")} covered` : `needs ${g.need.toLocaleString("en-GB")}` })),
+        ...(after ? p.donors.map(d => ({ key: `sent-${d.iso2}`, lat: d.departure[0], lon: d.departure[1], row: 0, color: "#18181b", label: `${d.name} ${d.sent.toLocaleString("en-GB")}` })) : [])
+      ]
+    : [];
   const regionShapes =
     mapLayer === "regions" && regionGeo && regionsData.data && !s && !p
       ? {
@@ -418,14 +481,13 @@ export default function App() {
 
       <div className="ws-body">
         {left && (
-          <Sidebar side="left" title="Active fires" sub={rd ? `${rd.counts.all} in the EU on ${longDate(rd.date)}` : null} onClose={() => setParams({ left: "0" })}>
+          <Sidebar side="left" title="Active fires" sub={rd ? `${rd.counts.all} in the EU` : null} onClose={() => setParams({ left: "0" })}>
             {() => (
               <FiresPanel
                 data={rd}
                 filter={filter}
                 onFilter={f => setParams({ filter: f === "all" ? undefined : f })}
                 selectedId={selectedFire?.id}
-                selectedFire={selectedFire}
                 onPick={f => setParams({ c: f.iso2, box: undefined, fire: f.id, right: right === "help" ? "help" : undefined })}
               />
             )}
@@ -436,6 +498,14 @@ export default function App() {
           <div className="map-toolbar">
             {s ? (
               <Segmented options={[["before", "Before"], ["after", "After"]]} value={simView} onChange={v => setParams({ view: v === "after" ? undefined : v })} label="Simulation view" />
+            ) : p ? (
+              <>
+                <Segmented options={[["before", "Before"], ["after", "With help"]]} value={after ? "after" : "before"} onChange={v => (v === "before" ? setPhase("hold") : setPhase("after"))} label="Plan view" />
+                <button className="tool" type="button" aria-label="Replay" title="Play the plan again" onClick={playPlan}>
+                  <Icon name="play" />
+                  <span className="tool-label">Replay</span>
+                </button>
+              </>
             ) : right !== "help" ? (
               <Segmented
                 options={[
@@ -472,21 +542,21 @@ export default function App() {
           {replay.error && <p className="notice floating-notice">Could not load {longDate(replayDate)}: {replay.error.message}</p>}
           <EuropeMap
             fill={fill}
-            selected={s ? null : p ? p.recipient.iso2 : iso2}
-            outline={s ? [...new Set(simShocks.map(x => x.iso2))] : p ? p.donors.map(d => d.iso2) : []}
-            badges={badges}
-            regionShapes={regionShapes}
+            selected={s ? null : p ? p.recipient : iso2}
+            outline={s ? [...new Set(simShocks.map(x => x.iso2))] : p && after ? p.donors.map(d => d.iso2) : []}
+            badges={p ? planBadges : badges}
+            regionShapes={helpShapes || regionShapes}
+            flows={flows}
+            slowFade={Boolean(p)}
             cells={cells}
             tiles={tileUrl}
             incidents={incidentsOn && incidentData.data ? { key: `${from}-${to}-${dataVersion}-${incidentData.data.features.length}`, data: incidentData.data } : null}
-            hatch={p ? p.left_out.map(l => l.iso2) : []}
-            routes={p ? routesFor(p) : []}
-            incident={p ? p.incident : null}
+            hatch={[]}
             onSelect={drawing ? undefined : selectCountry}
             fires={showFires && !p && !s ? fires : []}
             callout={showFires && !p && !s && calloutFire ? { lat: calloutFire.lat, lon: calloutFire.lon, title: calloutFire.name, sub: `${dec(calloutFire.ratio, 1)}× the ${month} median` } : null}
             flyTo={selectedFire ? [selectedFire.lat, selectedFire.lon] : null}
-            focus={p ? [p.incident, ...p.donors.map(d => d.departure || CENTROIDS[d.iso2]).filter(Boolean)] : box ? [[box[1], box[0]], [box[3], box[2]]] : null}
+            focus={p && p.status !== "no_fires" ? [p.incident, ...p.regions.map(g => g.anchor), ...p.donors.map(d => d.departure)] : box ? [[box[1], box[0]], [box[3], box[2]]] : null}
             flyOnSelect
             drawing={drawing}
             onDraw={setBox}
@@ -540,15 +610,13 @@ export default function App() {
           </Sidebar>
         )}
         {right === "data" && (
-          <Sidebar side="right" title="Data" sub="NASA FIRMS, MODIS and VIIRS" onClose={() => setParams({ right: undefined })} width={400}>
+          <Sidebar side="right" title="Detections" sub={`${areaTitle}, ${longDate(from)} to ${longDate(to)}`} onClose={() => setParams({ right: undefined })} width={400}>
             {() => (
               <DataPanel
                 summary={summary}
                 sources={sources}
                 pipeline={pipeline}
                 query={firmsQ}
-                areaLabel={areaTitle}
-                rangeLabel={`${longDate(from)} to ${longDate(to)}`}
                 onImport={runImport}
                 importing={importing}
                 importResult={importResult}
@@ -564,7 +632,7 @@ export default function App() {
           </Sidebar>
         )}
         {right === "help" && (
-          <Sidebar side="right" title="Who can help" onClose={() => setParams({ right: undefined })} width={360}>
+          <Sidebar side="right" title="Who can help" sub={`Fires on ${longDate(replayDate)}`} onClose={() => setParams({ right: undefined })} width={400}>
             {wide => <HelpPanel form={form} setForm={setForm} onRun={runPlan} plan={plan.data} error={plan.error} loading={plan.loading} wide={wide} />}
           </Sidebar>
         )}
